@@ -1,0 +1,1672 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Website Configuration - Admin Panel{% endblock %}
+{% block page_title %}Website Configuration{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Website Configuration</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Configuration / Website Settings</span>
+        </nav>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" onclick="saveAllConfig()">
+            <i class="fas fa-save me-2"></i>Save All Changes
+        </button>
+        <button class="btn btn-secondary" onclick="resetConfig()">
+            <i class="fas fa-undo me-2"></i>Reset to Defaults
+        </button>
+    </div>
+</div>
+
+<!-- Configuration Cards -->
+<div class="row">
+    <!-- General Settings Card -->
+    <div class="col-xl-6">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-cog me-2"></i>General Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="generalConfigForm">
+                    <div class="mb-3">
+                        <label class="form-label">Site Name</label>
+                        <input type="text" class="form-control" name="site_name" 
+                               value="{{ website_config.site_name or 'KDP Tools' }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Site Tagline</label>
+                        <textarea class="form-control" rows="3" name="tagline">{{ website_config.tagline or 'Professional KDP Tools Platform' }}</textarea>
+                        <small class="text-muted">Short description displayed below site name</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Site Description</label>
+                        <textarea class="form-control" rows="4" name="description">{{ website_config.description or 'Complete suite of AI-powered tools for Amazon KDP authors and publishers' }}</textarea>
+                        <small class="text-muted">Comprehensive site description (for search engines)</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Keywords</label>
+                        <textarea class="form-control" rows="2" name="keywords">{{ website_config.keywords or 'kdp, amazon, publishing, tools, books, authors' }}</textarea>
+                        <small class="text-muted">Keywords separated by commas</small>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveGeneralConfig()">
+                            <i class="fas fa-save me-2"></i>Save General Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branding Settings Card -->
+    <div class="col-xl-6">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-palette me-2"></i>Branding Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="brandingConfigForm">
+                    <div class="mb-3">
+                        <label class="form-label">Logo URL</label>
+                        <input type="url" class="form-control" name="logo_url" 
+                               value="{{ website_config.logo_url or '' }}" 
+                               placeholder="https://example.com/logo.png">
+                        <small class="text-muted">Direct link to logo image</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Site Icon (Favicon)</label>
+                        <input type="url" class="form-control" name="favicon_url" 
+                               value="{{ website_config.favicon_url or '' }}" 
+                               placeholder="https://example.com/favicon.ico">
+                        <small class="text-muted">Small icon displayed in browser tab</small>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveBrandingConfig()">
+                            <i class="fas fa-save me-2"></i>Save Branding Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features & Tools Card -->
+    <div class="col-xl-6">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>Tools & Features Settings
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="featuresConfigForm">
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="enable_user_registration" 
+                                   {% if website_config.enable_user_registration %}checked{% endif %}>
+                            <label class="form-check-label">
+                                Enable New User Registration
+                            </label>
+                        </div>
+                        <small class="text-muted d-block">If disabled, new users will not be able to register</small>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="enable_google_auth" 
+                                   {% if website_config.enable_google_auth %}checked{% endif %}>
+                            <label class="form-check-label">
+                                Enable Google Login
+                            </label>
+                        </div>
+                    </div>
+                    
+
+                    
+                    <div class="mb-4">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="enable_login" 
+                                   {% if website_config.enable_login %}checked{% endif %}>
+                            <label class="form-check-label">
+                                Enable Login
+                            </label>
+                        </div>
+                        <small class="text-muted d-block">If disabled, users will not be able to login</small>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveFeaturesConfig()">
+                            <i class="fas fa-save me-2"></i>Save Features Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEO & Analytics Card -->
+    <div class="col-xl-6">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-chart-line me-2"></i>SEO & Analytics
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="seoConfigForm">
+                    <div class="mb-3">
+                        <label class="form-label">Google Analytics ID</label>
+                        <input type="text" class="form-control" name="google_analytics_id" 
+                               value="{{ website_config.google_analytics_id or '' }}" 
+                               placeholder="G-XXXXXXXXXX">
+                        <small class="text-muted">Google Analytics ID</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Google Tag Manager ID</label>
+                        <input type="text" class="form-control" name="google_tag_manager_id" 
+                               value="{{ website_config.google_tag_manager_id or '' }}" 
+                               placeholder="GTM-XXXXXXX">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Facebook Pixel ID</label>
+                        <input type="text" class="form-control" name="facebook_pixel_id" 
+                               value="{{ website_config.facebook_pixel_id or '' }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Additional HTML Headers</label>
+                        <textarea class="form-control font-monospace" rows="4" name="custom_head_tags"
+                                  placeholder="<!-- Add HTML headers here -->">{{ website_config.custom_head_tags or '' }}</textarea>
+                        <small class="text-muted">HTML code added inside &lt;head&gt;</small>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveSeoConfig()">
+                            <i class="fas fa-save me-2"></i>Save SEO Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contact & Social Media Card -->
+    <div class="col-xl-12">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-envelope me-2"></i>Contact Information & Social Media
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="contactConfigForm">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Contact Email</label>
+                                <input type="email" class="form-control" name="contact_email" 
+                                       value="{{ website_config.contact_email or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Phone Number</label>
+                                <input type="text" class="form-control" name="contact_phone" 
+                                       value="{{ website_config.contact_phone or '' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Address</label>
+                                <input type="text" class="form-control" name="contact_address" 
+                                       value="{{ website_config.contact_address or '' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Facebook</label>
+                                <input type="url" class="form-control" name="facebook_url" 
+                                       value="{{ website_config.facebook_url or '' }}" 
+                                       placeholder="https://facebook.com/username">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Twitter</label>
+                                <input type="url" class="form-control" name="twitter_url" 
+                                       value="{{ website_config.twitter_url or '' }}" 
+                                       placeholder="https://twitter.com/username">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Instagram</label>
+                                <input type="url" class="form-control" name="instagram_url" 
+                                       value="{{ website_config.instagram_url or '' }}" 
+                                       placeholder="https://instagram.com/username">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">LinkedIn</label>
+                                <input type="url" class="form-control" name="linkedin_url" 
+                                       value="{{ website_config.linkedin_url or '' }}" 
+                                       placeholder="https://linkedin.com/company/name">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveContactConfig()">
+                            <i class="fas fa-save me-2"></i>Save Contact Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Maintenance Mode Card -->
+    <div class="col-xl-12">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tools me-2"></i>Maintenance Mode
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="maintenanceConfigForm">
+                    <div class="row">
+                        <!-- Enable Maintenance Toggle -->
+                        <div class="col-md-12 mb-4">
+                            <div class="d-flex align-items-center justify-content-between p-3 border rounded">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <i class="fas fa-power-off me-2 text-warning"></i>
+                                        Enable Maintenance Mode
+                                    </h6>
+                                    <small class="text-muted">
+                                        When enabled, only admin users can access the site. All other users will see the maintenance page.
+                                    </small>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="enable_maintenance" 
+                                           name="enable_maintenance" {{ 'checked' if website_config.enable_maintenance else '' }}>
+                                    <label class="form-check-label" for="enable_maintenance"></label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Maintenance Title -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Maintenance Page Title</label>
+                            <input type="text" class="form-control" name="maintenance_title" 
+                                   value="{{ website_config.maintenance_title or 'Site Under Maintenance' }}" 
+                                   placeholder="Site Under Maintenance">
+                        </div>
+                        
+                        <!-- Estimated Time -->
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Estimated Completion Time</label>
+                            <input type="text" class="form-control" name="maintenance_estimated_time" 
+                                   value="{{ website_config.maintenance_estimated_time or '' }}" 
+                                   placeholder="e.g., 2 hours, Tomorrow at 10 AM">
+                        </div>
+                        
+                        <!-- Maintenance Message -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Maintenance Message</label>
+                            <textarea class="form-control" rows="4" name="maintenance_message" 
+                                      placeholder="We are currently performing scheduled maintenance to improve your experience. Please check back soon.">{{ website_config.maintenance_message or 'We are currently performing scheduled maintenance to improve your experience. Please check back soon.' }}</textarea>
+                        </div>
+                        
+                        <!-- Contact Information -->
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Contact Information (Optional)</label>
+                            <textarea class="form-control" rows="3" name="maintenance_contact_info" 
+                                      placeholder="For urgent matters, please contact us at support@example.com">{{ website_config.maintenance_contact_info or '' }}</textarea>
+                            <small class="text-muted">Additional contact information to display on the maintenance page</small>
+                        </div>
+                    </div>
+                    
+                    <!-- Maintenance Preview -->
+                    <div class="mt-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-eye me-2"></i>Maintenance Page Preview
+                        </h6>
+                        <div class="border rounded p-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-align: center;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">
+                                <i class="fas fa-tools"></i>
+                            </div>
+                            <h3 id="preview-title">{{ website_config.maintenance_title or 'Site Under Maintenance' }}</h3>
+                            <p id="preview-message" style="margin: 1rem 0;">{{ website_config.maintenance_message or 'We are currently performing scheduled maintenance to improve your experience. Please check back soon.' }}</p>
+                            <div id="preview-time" style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 5px; margin: 1rem 0;">
+                                <small><i class="fas fa-clock me-1"></i>Estimated completion: <span>{{ website_config.maintenance_estimated_time or 'Not specified' }}</span></small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end mt-4">
+                        <button type="button" class="btn btn-warning" onclick="saveMaintenanceConfig()">
+                            <i class="fas fa-save me-2"></i>Save Maintenance Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Content Management Section -->
+<div class="row">
+    <div class="col-xl-12">
+        <div class="admin-card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-file-alt me-2"></i>Home Page Content Management
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="contentConfigForm">
+                    <!-- Hero Section -->
+                    <h6 class="mb-3 text-primary">Hero Section</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Hero Title</label>
+                                <input type="text" class="form-control" name="hero_title" 
+                                       value="{{ website_config.hero_title or 'Your Complete KDP Tools Toolkit' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Hero Subtitle</label>
+                                <input type="text" class="form-control" name="hero_subtitle" 
+                                       value="{{ website_config.hero_subtitle or 'Advanced AI-powered publishing tools for Amazon KDP authors' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Free Account Text</label>
+                                <input type="text" class="form-control" name="hero_free_text" 
+                                       value="{{ website_config.hero_free_text or 'Free account includes 3 daily tool uses' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">No Credit Card Text</label>
+                                <input type="text" class="form-control" name="hero_no_card_text" 
+                                       value="{{ website_config.hero_no_card_text or 'No credit card required' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Features Section -->
+                    <h6 class="mb-3 text-primary mt-4">Features Section</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Features Title</label>
+                                <input type="text" class="form-control" name="features_title" 
+                                       value="{{ website_config.features_title or 'Powerful Tools for KDP Success' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Features Subtitle</label>
+                                <input type="text" class="form-control" name="features_subtitle" 
+                                       value="{{ website_config.features_subtitle or 'Everything you need to create, market, and sell your books on Amazon' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pricing Section -->
+                    <h6 class="mb-3 text-primary mt-4">Pricing Section</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Pricing Title</label>
+                                <input type="text" class="form-control" name="pricing_title" 
+                                       value="{{ website_config.pricing_title or 'Simple, Transparent Pricing' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Pricing Subtitle</label>
+                                <input type="text" class="form-control" name="pricing_subtitle" 
+                                       value="{{ website_config.pricing_subtitle or 'Choose the plan that works best for your publishing goals' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CTA Section -->
+                    <h6 class="mb-3 text-primary mt-4">Call to Action Section</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">CTA Title</label>
+                                <input type="text" class="form-control" name="cta_title" 
+                                       value="{{ website_config.cta_title or 'Ready to Boost Your KDP Success?' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">CTA Subtitle</label>
+                                <input type="text" class="form-control" name="cta_subtitle" 
+                                       value="{{ website_config.cta_subtitle or 'Join thousands of successful publishers who use our tools to create bestselling books on Amazon KDP.' }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Section -->
+                    <h6 class="mb-3 text-primary mt-4">Footer Section</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Footer Description</label>
+                                <input type="text" class="form-control" name="footer_description" 
+                                       value="{{ website_config.footer_description or 'Your complete toolkit for Amazon KDP publishing success.' }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Footer Tagline</label>
+                                <input type="text" class="form-control" name="footer_tagline" 
+                                       value="{{ website_config.footer_tagline or 'Made for Amazon KDP Publishers' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button type="button" class="btn btn-primary" onclick="saveContentConfig()">
+                            <i class="fas fa-save me-2"></i>Save Content Settings
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pricing Plans Management -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="admin-card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-tags me-2"></i>Pricing Plans Management
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="pricingConfigForm">
+                    <div class="row">
+                        <!-- Free Plan -->
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2 mb-3 text-success">Free Plan</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Plan Name</label>
+                                <input type="text" class="form-control" name="free_plan_name" value="{{ website_config.free_plan_name or 'Free Plan' }}">
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Price</label>
+                                        <input type="text" class="form-control" name="free_plan_price" value="{{ website_config.free_plan_price or '$0' }}">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Period</label>
+                                        <input type="text" class="form-control" name="free_plan_period" value="{{ website_config.free_plan_period or '/forever' }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 1</label>
+                                <input type="text" class="form-control" name="free_plan_feature1" value="{{ website_config.free_plan_feature1 or '3 tool uses per day' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 2</label>
+                                <input type="text" class="form-control" name="free_plan_feature2" value="{{ website_config.free_plan_feature2 or 'Access to all 8 tools' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 3</label>
+                                <input type="text" class="form-control" name="free_plan_feature3" value="{{ website_config.free_plan_feature3 or 'No credit card required' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 4</label>
+                                <input type="text" class="form-control" name="free_plan_feature4" value="{{ website_config.free_plan_feature4 or 'Email support' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 5 (Optional)</label>
+                                <input type="text" class="form-control" name="free_plan_feature5" value="{{ website_config.free_plan_feature5 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 6 (Optional)</label>
+                                <input type="text" class="form-control" name="free_plan_feature6" value="{{ website_config.free_plan_feature6 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 7 (Optional)</label>
+                                <input type="text" class="form-control" name="free_plan_feature7" value="{{ website_config.free_plan_feature7 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 8 (Optional)</label>
+                                <input type="text" class="form-control" name="free_plan_feature8" value="{{ website_config.free_plan_feature8 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <h6 class="border-top pt-3 mb-3 text-success">Button Texts</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Button Text</label>
+                                <input type="text" class="form-control" name="free_plan_button_text" value="{{ website_config.free_plan_button_text or 'Get Started Free' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Current Plan Button Text</label>
+                                <input type="text" class="form-control" name="free_plan_current_button_text" value="{{ website_config.free_plan_current_button_text or 'Current Plan' }}">
+                            </div>
+                        </div>
+                        
+                        <!-- Pro Plan -->
+                        <div class="col-md-6">
+                            <h6 class="border-bottom pb-2 mb-3 text-primary">Pro Plan</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Plan Name</label>
+                                <input type="text" class="form-control" name="pro_plan_name" value="{{ website_config.pro_plan_name or 'Pro Plan' }}">
+                            </div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Price</label>
+                                        <input type="text" class="form-control" name="pro_plan_price" value="{{ website_config.pro_plan_price or '$15' }}">
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Period</label>
+                                        <input type="text" class="form-control" name="pro_plan_period" value="{{ website_config.pro_plan_period or '/month' }}">
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 1</label>
+                                <input type="text" class="form-control" name="pro_plan_feature1" value="{{ website_config.pro_plan_feature1 or 'Unlimited tool uses' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 2</label>
+                                <input type="text" class="form-control" name="pro_plan_feature2" value="{{ website_config.pro_plan_feature2 or 'Access to all 8 tools' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 3</label>
+                                <input type="text" class="form-control" name="pro_plan_feature3" value="{{ website_config.pro_plan_feature3 or 'Priority support' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 4</label>
+                                <input type="text" class="form-control" name="pro_plan_feature4" value="{{ website_config.pro_plan_feature4 or 'Advanced features' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 5</label>
+                                <input type="text" class="form-control" name="pro_plan_feature5" value="{{ website_config.pro_plan_feature5 or 'Cancel anytime' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 6 (Optional)</label>
+                                <input type="text" class="form-control" name="pro_plan_feature6" value="{{ website_config.pro_plan_feature6 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 7 (Optional)</label>
+                                <input type="text" class="form-control" name="pro_plan_feature7" value="{{ website_config.pro_plan_feature7 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Feature 8 (Optional)</label>
+                                <input type="text" class="form-control" name="pro_plan_feature8" value="{{ website_config.pro_plan_feature8 or '' }}" placeholder="Leave empty if not needed">
+                            </div>
+                            <h6 class="border-top pt-3 mb-3 text-primary">Button Texts</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Button Text</label>
+                                <input type="text" class="form-control" name="pro_plan_button_text" value="{{ website_config.pro_plan_button_text or 'Upgrade Now' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Current Plan Button Text</label>
+                                <input type="text" class="form-control" name="pro_plan_current_button_text" value="{{ website_config.pro_plan_current_button_text or 'Current Plan' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Guarantee Text -->
+                    <div class="col-12">
+                        <div class="border rounded p-3">
+                            <h6 class="text-info mb-3"><i class="fas fa-shield-check me-2"></i>Guarantee Text</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Pricing Guarantee Text</label>
+                                <input type="text" class="form-control" name="pricing_guarantee_text" value="{{ website_config.pricing_guarantee_text or 'All plans include 30-day money-back guarantee' }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-success" onclick="savePricingPlans()">
+                            <i class="fas fa-save me-2"></i>Save Pricing Plans
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Tools Content Management -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>Tools Content Management</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Title Generator -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-magic me-2"></i>Title Generator</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_title_generator_title" value="{{ website_config.tool_title_generator_title or 'Title Generator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_title_generator_description" rows="2">{{ website_config.tool_title_generator_description or 'Create compelling book titles that grab attention and drive sales.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_title_generator_icon" value="{{ website_config.tool_title_generator_icon or 'fas fa-magic' }}" placeholder="fas fa-magic">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Description Generator -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-file-alt me-2"></i>Description Generator</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_description_generator_title" value="{{ website_config.tool_description_generator_title or 'Description Generator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_description_generator_description" rows="2">{{ website_config.tool_description_generator_description or 'Write persuasive book descriptions that convert browsers into buyers.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_description_generator_icon" value="{{ website_config.tool_description_generator_icon or 'fas fa-file-alt' }}" placeholder="fas fa-file-alt">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Keyword Research -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-search me-2"></i>Keyword Research</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_keyword_research_title" value="{{ website_config.tool_keyword_research_title or 'Keyword Research' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_keyword_research_description" rows="2">{{ website_config.tool_keyword_research_description or 'Discover high-traffic keywords to improve your book\'s discoverability.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_keyword_research_icon" value="{{ website_config.tool_keyword_research_icon or 'fas fa-search' }}" placeholder="fas fa-search">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Royalty Calculator -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-calculator me-2"></i>Royalty Calculator</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_royalty_calculator_title" value="{{ website_config.tool_royalty_calculator_title or 'Royalty Calculator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_royalty_calculator_description" rows="2">{{ website_config.tool_royalty_calculator_description or 'Calculate your potential earnings and optimize your pricing strategy.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_royalty_calculator_icon" value="{{ website_config.tool_royalty_calculator_icon or 'fas fa-calculator' }}" placeholder="fas fa-calculator">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subtitle Generator -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-heading me-2"></i>Subtitle Generator</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_subtitle_generator_title" value="{{ website_config.tool_subtitle_generator_title or 'Subtitle Generator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_subtitle_generator_description" rows="2">{{ website_config.tool_subtitle_generator_description or 'Generate perfect subtitles that complement your main title.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_subtitle_generator_icon" value="{{ website_config.tool_subtitle_generator_icon or 'fas fa-heading' }}" placeholder="fas fa-heading">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Author Generator -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-user-edit me-2"></i>Author Generator</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_author_generator_title" value="{{ website_config.tool_author_generator_title or 'Author Generator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_author_generator_description" rows="2">{{ website_config.tool_author_generator_description or 'Create professional pen names that fit your genre and style.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_author_generator_icon" value="{{ website_config.tool_author_generator_icon or 'fas fa-user-edit' }}" placeholder="fas fa-user-edit">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Category Finder -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-tags me-2"></i>Category Finder</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_category_finder_title" value="{{ website_config.tool_category_finder_title or 'Category Finder' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_category_finder_description" rows="2">{{ website_config.tool_category_finder_description or 'Find the best Amazon categories for maximum visibility.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_category_finder_icon" value="{{ website_config.tool_category_finder_icon or 'fas fa-tags' }}" placeholder="fas fa-tags">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Trademark Search -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-shield-alt me-2"></i>Trademark Search</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Title</label>
+                                <input type="text" class="form-control" name="tool_trademark_search_title" value="{{ website_config.tool_trademark_search_title or 'Trademark Search' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Description</label>
+                                <textarea class="form-control" name="tool_trademark_search_description" rows="2">{{ website_config.tool_trademark_search_description or 'Check for trademark conflicts before publishing your book.' }}</textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Icon Class</label>
+                                <input type="text" class="form-control" name="tool_trademark_search_icon" value="{{ website_config.tool_trademark_search_icon or 'fas fa-shield-alt' }}" placeholder="fas fa-shield-alt">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <button type="button" class="btn btn-success" id="saveToolsBtn">
+                        <i class="fas fa-save me-2"></i>Save Tools Content
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation & Footer Content Management -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-bars me-2"></i>Navigation & Footer Content</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Navigation Menu -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-compass me-2"></i>Navigation Menu</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Home Text</label>
+                                <input type="text" class="form-control" name="nav_home_text" value="{{ website_config.nav_home_text or 'Home' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Dashboard Text</label>
+                                <input type="text" class="form-control" name="nav_dashboard_text" value="{{ website_config.nav_dashboard_text or 'Dashboard' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Plans Text</label>
+                                <input type="text" class="form-control" name="nav_plans_text" value="{{ website_config.nav_plans_text or 'Plans' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Contact Text</label>
+                                <input type="text" class="form-control" name="nav_contact_text" value="{{ website_config.nav_contact_text or 'Contact' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer Quick Links -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-link me-2"></i>Footer Quick Links</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Section Title</label>
+                                <input type="text" class="form-control" name="footer_quick_links_title" value="{{ website_config.footer_quick_links_title or 'Quick Links' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Link 1</label>
+                                <input type="text" class="form-control" name="footer_quick_links_1" value="{{ website_config.footer_quick_links_1 or 'Pricing Plans' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Link 2</label>
+                                <input type="text" class="form-control" name="footer_quick_links_2" value="{{ website_config.footer_quick_links_2 or 'Contact Support' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Link 3</label>
+                                <input type="text" class="form-control" name="footer_quick_links_3" value="{{ website_config.footer_quick_links_3 or 'Dashboard' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer Tools -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-wrench me-2"></i>Footer Tools</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Section Title</label>
+                                <input type="text" class="form-control" name="footer_tools_title" value="{{ website_config.footer_tools_title or 'Tools' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Tool 1</label>
+                                <input type="text" class="form-control" name="footer_tools_1" value="{{ website_config.footer_tools_1 or 'Title Generator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Tool 2</label>
+                                <input type="text" class="form-control" name="footer_tools_2" value="{{ website_config.footer_tools_2 or 'Keyword Research' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Tool 3</label>
+                                <input type="text" class="form-control" name="footer_tools_3" value="{{ website_config.footer_tools_3 or 'Royalty Calculator' }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Tool 4</label>
+                                <input type="text" class="form-control" name="footer_tools_4" value="{{ website_config.footer_tools_4 or 'And more...' }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Footer Copyright -->
+                    <div class="col-md-6 mb-4">
+                        <div class="border rounded p-3">
+                            <h6 class="text-primary mb-3"><i class="fas fa-copyright me-2"></i>Footer Copyright</h6>
+                            <div class="mb-3">
+                                <label class="form-label">Copyright Text</label>
+                                <textarea class="form-control" name="footer_copyright_text" rows="2">{{ website_config.footer_copyright_text or '© 2024 KDP Tools Pro. All rights reserved.' }}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-end">
+                    <button type="button" class="btn btn-success" id="saveNavFooterBtn">
+                        <i class="fas fa-save me-2"></i>Save Navigation & Footer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Button Texts Management Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="fas fa-mouse-pointer me-2"></i>Button Texts Management
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-4">
+            <!-- Primary Action Buttons -->
+            <div class="col-md-6 mb-4">
+                <div class="border rounded p-3">
+                    <h6 class="text-primary mb-3"><i class="fas fa-play me-2"></i>Primary Action Buttons</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Start Free Trial Button</label>
+                            <input type="text" class="form-control" name="button_start_free_trial" value="{{ website_config.button_start_free_trial or 'Start Free Trial' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Get Started Button</label>
+                            <input type="text" class="form-control" name="button_get_started" value="{{ website_config.button_get_started or 'Get Started' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">View Pricing Button</label>
+                            <input type="text" class="form-control" name="button_view_pricing" value="{{ website_config.button_view_pricing or 'View Pricing' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Start Free Today Button</label>
+                            <input type="text" class="form-control" name="button_start_free_today" value="{{ website_config.button_start_free_today or 'Start Free Today' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Authentication Buttons -->
+            <div class="col-md-6 mb-4">
+                <div class="border rounded p-3">
+                    <h6 class="text-primary mb-3"><i class="fas fa-sign-in-alt me-2"></i>Authentication Buttons</h6>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Sign In Button</label>
+                            <input type="text" class="form-control" name="button_sign_in" value="{{ website_config.button_sign_in or 'Sign In' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Login Button</label>
+                            <input type="text" class="form-control" name="button_login" value="{{ website_config.button_login or 'Login' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Register Button</label>
+                            <input type="text" class="form-control" name="button_register" value="{{ website_config.button_register or 'Register' }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Logout Button</label>
+                            <input type="text" class="form-control" name="button_logout" value="{{ website_config.button_logout or 'Logout' }}">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-end">
+            <button type="button" class="btn btn-success" id="saveButtonTextsBtn">
+                <i class="fas fa-save me-2"></i>Save Button Texts
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>Preview Changes
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.form-control-color {
+    height: 38px;
+    border-radius: 6px;
+}
+
+.font-monospace {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.form-check-switch .form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.config-preview {
+    background: #1e2329;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+.config-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #374151;
+}
+
+.config-item:last-child {
+    border-bottom: none;
+}
+
+.config-label {
+    font-weight: 500;
+    color: #e2e8f0;
+}
+
+.config-value {
+    color: #a0aec0;
+    font-size: 0.875rem;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Website Configuration Management
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Website configuration JavaScript loaded');
+    
+    // Synchronize color pickers with text inputs
+    document.querySelectorAll('input[type="color"]').forEach(colorPicker => {
+        const textInput = colorPicker.parentNode.querySelector('input[type="text"]');
+        
+        if (textInput) {
+            colorPicker.addEventListener('change', function() {
+                textInput.value = this.value;
+            });
+            
+            textInput.addEventListener('change', function() {
+                if (isValidHexColor(this.value)) {
+                    colorPicker.value = this.value;
+                }
+            });
+        }
+    });
+});
+
+// Save configuration functions
+window.saveGeneralConfig = function() {
+    console.log('Saving general config...');
+    const form = document.getElementById('generalConfigForm');
+    if (!form) {
+        console.error('General config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        if (key.includes('_color_text')) continue; // Skip text color inputs
+        data[key] = value;
+    }
+    
+    console.log('General config data:', data);
+    saveConfiguration(data, 'General settings saved successfully!');
+};
+
+window.saveBrandingConfig = function() {
+    console.log('Saving branding config...');
+    const form = document.getElementById('brandingConfigForm');
+    if (!form) {
+        console.error('Branding config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        if (key.includes('_color_text')) continue; // Skip text color inputs
+        data[key] = value;
+    }
+    
+    console.log('Branding config data:', data);
+    saveConfiguration(data, 'Branding settings saved successfully!');
+};
+
+window.saveFeaturesConfig = function() {
+    console.log('Saving features config...');
+    const form = document.getElementById('featuresConfigForm');
+    if (!form) {
+        console.error('Features config form not found');
+        return;
+    }
+    
+    const data = {};
+    
+    // Handle checkboxes
+    form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        data[checkbox.name] = checkbox.checked;
+    });
+    
+    // Handle other inputs
+    form.querySelectorAll('input[type="number"], input[type="text"], select, textarea').forEach(input => {
+        if (input.type === 'number') {
+            data[input.name] = parseInt(input.value) || 0;
+        } else {
+            data[input.name] = input.value;
+        }
+    });
+    
+    console.log('Features config data:', data);
+    saveConfiguration(data, 'Features settings saved successfully!');
+};
+
+window.saveSeoConfig = function() {
+    console.log('Saving SEO config...');
+    const form = document.getElementById('seoConfigForm');
+    if (!form) {
+        console.error('SEO config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    console.log('SEO config data:', data);
+    saveConfiguration(data, 'SEO settings saved successfully!');
+};
+
+window.saveContactConfig = function() {
+    console.log('Saving contact config...');
+    const form = document.getElementById('contactConfigForm');
+    if (!form) {
+        console.error('Contact config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    console.log('Contact config data:', data);
+    saveConfiguration(data, 'Contact settings saved successfully!');
+};
+
+window.saveMaintenanceConfig = function() {
+    console.log('Saving maintenance config...');
+    const form = document.getElementById('maintenanceConfigForm');
+    if (!form) {
+        console.error('Maintenance config form not found');
+        return;
+    }
+    
+    const data = {};
+    
+    // Handle checkbox for enable_maintenance
+    const enableMaintenanceCheckbox = form.querySelector('input[name="enable_maintenance"]');
+    if (enableMaintenanceCheckbox) {
+        data['enable_maintenance'] = enableMaintenanceCheckbox.checked;
+    }
+    
+    // Handle other inputs
+    form.querySelectorAll('input[type="text"], textarea').forEach(input => {
+        data[input.name] = input.value;
+    });
+    
+    console.log('Maintenance config data:', data);
+    
+    // Show warning if enabling maintenance mode
+    if (data['enable_maintenance']) {
+        if (!confirm('⚠️ Warning: Enabling maintenance mode will make the site inaccessible to all users except admins. Are you sure you want to continue?')) {
+            return;
+        }
+    }
+    
+    saveConfiguration(data, 'Maintenance settings saved successfully!');
+};
+
+window.saveContentConfig = function() {
+    console.log('Saving content config...');
+    const form = document.getElementById('contentConfigForm');
+    if (!form) {
+        console.error('Content config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    console.log('Content config data:', data);
+    saveConfiguration(data, 'Content settings saved successfully!');
+};
+
+window.savePricingPlans = function() {
+    console.log('Saving pricing plans config...');
+    const form = document.getElementById('pricingConfigForm');
+    if (!form) {
+        console.error('Pricing config form not found');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    const data = {};
+    
+    for (let [key, value] of formData.entries()) {
+        data[key] = value;
+    }
+    
+    console.log('Pricing config data:', data);
+    saveConfiguration(data, 'Pricing plans saved successfully!');
+};
+
+// Save all configurations at once
+window.saveAllConfig = function() {
+    console.log('Saving all configurations...');
+    const allData = {};
+    
+    // Collect data from all forms
+    const formIds = ['generalConfigForm', 'brandingConfigForm', 'featuresConfigForm', 'seoConfigForm', 'contactConfigForm'];
+    
+    formIds.forEach(formId => {
+        const form = document.getElementById(formId);
+        if (form) {
+            // Handle checkboxes
+            form.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+                allData[checkbox.name] = checkbox.checked;
+            });
+            
+            // Handle other inputs
+            form.querySelectorAll('input[type="text"], input[type="url"], input[type="number"], input[type="color"], select, textarea').forEach(input => {
+                if (input.name.includes('_color_text')) return; // Skip text color inputs
+                
+                if (input.type === 'number') {
+                    allData[input.name] = parseInt(input.value) || 0;
+                } else {
+                    allData[input.name] = input.value;
+                }
+            });
+        }
+    });
+    
+    console.log('All config data:', allData);
+    saveConfiguration(allData, 'All settings saved successfully!');
+};
+
+// Reset configuration
+window.resetConfig = function() {
+    if (confirm('Are you sure you want to reset all settings to defaults? This action cannot be undone.')) {
+        console.log('Resetting configuration...');
+        
+        fetch('/admin/website-config/reset', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Reset response:', data);
+            if (data.success) {
+                showToast(data.message, 'success');
+                setTimeout(() => window.location.reload(), 1500);
+            } else {
+                showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Reset error:', error);
+            showToast('Error resetting configuration', 'error');
+        });
+    }
+};
+
+// Helper functions
+function saveConfiguration(data, successMessage) {
+    console.log('Saving configuration:', data);
+    
+    const button = event ? event.target : null;
+    let originalText = '';
+    
+    if (button) {
+        originalText = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+        button.disabled = true;
+    }
+    
+    fetch('/admin/website-config/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(responseData => {
+        console.log('Save response:', responseData);
+        if (responseData.success) {
+            showToast(successMessage, 'success');
+        } else {
+            showToast(responseData.message || 'Save failed', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Save error:', error);
+        showToast('Error saving configuration', 'error');
+    })
+    .finally(() => {
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    });
+}
+
+function isValidHexColor(color) {
+    return /^#[0-9A-F]{6}$/i.test(color);
+}
+
+function showToast(message, type = 'info') {
+    console.log(`Showing toast: ${message} (${type})`);
+    
+    // Create toast element
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
+    const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    
+    const toastHtml = `
+        <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas ${iconClass} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    // Add to toast container or create one
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+        toastContainer.style.zIndex = '9999';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    // Initialize and show toast
+    const toastElement = document.getElementById(toastId);
+    if (window.bootstrap && bootstrap.Toast) {
+        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+        toast.show();
+        
+        // Remove toast element after hiding
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    } else {
+        // Fallback if Bootstrap is not available
+        setTimeout(() => {
+            toastElement.remove();
+        }, 5000);
+    }
+}
+
+// Event listeners for save buttons
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Live preview for maintenance settings
+    const maintenanceForm = document.getElementById('maintenanceConfigForm');
+    if (maintenanceForm) {
+        // Update preview when inputs change
+        const titleInput = maintenanceForm.querySelector('input[name="maintenance_title"]');
+        const messageInput = maintenanceForm.querySelector('textarea[name="maintenance_message"]');
+        const timeInput = maintenanceForm.querySelector('input[name="maintenance_estimated_time"]');
+        
+        if (titleInput) {
+            titleInput.addEventListener('input', function() {
+                const previewTitle = document.getElementById('preview-title');
+                if (previewTitle) {
+                    previewTitle.textContent = this.value || 'Site Under Maintenance';
+                }
+            });
+        }
+        
+        if (messageInput) {
+            messageInput.addEventListener('input', function() {
+                const previewMessage = document.getElementById('preview-message');
+                if (previewMessage) {
+                    previewMessage.textContent = this.value || 'We are currently performing scheduled maintenance to improve your experience. Please check back soon.';
+                }
+            });
+        }
+        
+        if (timeInput) {
+            timeInput.addEventListener('input', function() {
+                const previewTime = document.querySelector('#preview-time span');
+                if (previewTime) {
+                    previewTime.textContent = this.value || 'Not specified';
+                }
+            });
+        }
+    }
+    
+    // Tools Content Save Function
+    const saveToolsBtn = document.getElementById('saveToolsBtn');
+    if (saveToolsBtn) {
+        saveToolsBtn.addEventListener('click', function() {
+            console.log('Save Tools Content clicked');
+            
+            const button = this;
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+            
+            const data = {};
+            
+            // Collect tools content data
+            const toolsFields = [
+                'tool_title_generator_title', 'tool_title_generator_description', 'tool_title_generator_icon',
+                'tool_description_generator_title', 'tool_description_generator_description', 'tool_description_generator_icon',
+                'tool_keyword_research_title', 'tool_keyword_research_description', 'tool_keyword_research_icon',
+                'tool_royalty_calculator_title', 'tool_royalty_calculator_description', 'tool_royalty_calculator_icon',
+                'tool_subtitle_generator_title', 'tool_subtitle_generator_description', 'tool_subtitle_generator_icon',
+                'tool_author_generator_title', 'tool_author_generator_description', 'tool_author_generator_icon',
+                'tool_category_finder_title', 'tool_category_finder_description', 'tool_category_finder_icon',
+                'tool_trademark_search_title', 'tool_trademark_search_description', 'tool_trademark_search_icon'
+            ];
+            
+            toolsFields.forEach(field => {
+                const element = document.querySelector(`[name="${field}"]`);
+                if (element) {
+                    data[field] = element.value;
+                }
+            });
+            
+            console.log('Saving tools content:', data);
+            
+            fetch('/admin/website-config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(responseData => {
+                console.log('Tools content save response:', responseData);
+                if (responseData.success) {
+                    showToast('Tools content saved successfully!', 'success');
+                } else {
+                    showToast('Error saving tools content: ' + (responseData.message || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Tools content save error:', error);
+                showToast('Error saving tools content: ' + error.message, 'error');
+            })
+            .finally(() => {
+                console.log('Resetting tools button');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            });
+        });
+    }
+    
+    // Navigation & Footer Save Function
+    const saveNavFooterBtn = document.getElementById('saveNavFooterBtn');
+    if (saveNavFooterBtn) {
+        saveNavFooterBtn.addEventListener('click', function() {
+            console.log('Save Navigation & Footer clicked');
+            
+            const button = this;
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+            
+            const data = {};
+            
+            // Collect navigation and footer data
+            const navFooterFields = [
+                'pricing_guarantee_text', 'nav_home_text', 'nav_dashboard_text', 'nav_plans_text', 'nav_contact_text',
+                'footer_quick_links_title', 'footer_quick_links_1', 'footer_quick_links_2', 'footer_quick_links_3',
+                'footer_tools_title', 'footer_tools_1', 'footer_tools_2', 'footer_tools_3', 'footer_tools_4',
+                'footer_copyright_text'
+            ];
+            
+            navFooterFields.forEach(field => {
+                const element = document.querySelector(`[name="${field}"]`);
+                if (element) {
+                    data[field] = element.value;
+                }
+            });
+            
+            console.log('Saving navigation & footer content:', data);
+            
+            fetch('/admin/website-config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(responseData => {
+                console.log('Navigation & footer save response:', responseData);
+                if (responseData.success) {
+                    showToast('Navigation & Footer content saved successfully!', 'success');
+                } else {
+                    showToast('Error saving navigation & footer content: ' + (responseData.message || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Navigation & footer save error:', error);
+                showToast('Error saving navigation & footer content: ' + error.message, 'error');
+            })
+            .finally(() => {
+                console.log('Resetting navigation & footer button');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            });
+        });
+    }
+    
+    // Button Texts Save Function
+    const saveButtonTextsBtn = document.getElementById('saveButtonTextsBtn');
+    if (saveButtonTextsBtn) {
+        saveButtonTextsBtn.addEventListener('click', function() {
+            console.log('Save Button Texts clicked');
+            
+            const button = this;
+            const originalText = button.innerHTML;
+            
+            button.disabled = true;
+            button.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+            
+            const data = {};
+            
+            // Collect button text data
+            const buttonFields = [
+                'button_start_free_trial', 'button_sign_in', 'button_login', 
+                'button_register', 'button_logout', 'button_get_started',
+                'button_view_pricing', 'button_start_free_today'
+            ];
+            
+            buttonFields.forEach(field => {
+                const element = document.querySelector(`[name="${field}"]`);
+                if (element) {
+                    data[field] = element.value;
+                }
+            });
+            
+            console.log('Saving button texts:', data);
+            
+            fetch('/admin/website-config/save', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(responseData => {
+                console.log('Button texts save response:', responseData);
+                if (responseData.success) {
+                    showToast('Button texts saved successfully!', 'success');
+                } else {
+                    showToast('Error saving button texts: ' + (responseData.message || 'Unknown error'), 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Button texts save error:', error);
+                showToast('Error saving button texts: ' + error.message, 'error');
+            })
+            .finally(() => {
+                console.log('Resetting button texts button');
+                button.disabled = false;
+                button.innerHTML = originalText;
+            });
+        });
+    }
+    
+});
+</script>
+{% endblock %}

@@ -1,0 +1,501 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site_name }} - {{ site_description }}{% endblock %}
+
+{% block description %}{{ site_description }}{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section bg-gradient text-white" style="padding: 2rem 0 3rem 0 !important; margin-top: 0 !important;">
+    <div class="container">
+        <div class="row align-items-center min-vh-75">
+            <div class="col-lg-6">
+                <h1 class="display-4 fw-bold mb-4">
+                    {{ site_config.hero_title or 'Your Complete ' + site_name + ' Toolkit' }}
+                </h1>
+                <p class="lead mb-4">
+                    {{ site_config.hero_subtitle or site_description }}
+                </p>
+                <div class="d-flex flex-wrap gap-3">
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg">
+                            {{ button_texts.start_free_trial }}
+                        </a>
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-light btn-lg">
+                            {{ button_texts.sign_in }}
+                        </a>
+                    {% endif %}
+                </div>
+                
+                {% if not current_user.is_authenticated %}
+                <div class="mt-4">
+                    <small class="text-light opacity-75">
+                        <i class="fas fa-check me-1"></i>{{ site_config.hero_free_text or 'Free account includes 3 daily tool uses' }}
+                        <br>
+                        <i class="fas fa-check me-1"></i>{{ site_config.hero_no_card_text or 'No credit card required' }}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-image text-center">
+                    <i class="fas fa-book-open text-primary" style="font-size: 12rem; opacity: 0.1;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features-section py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-5">
+                <h2 class="h1 fw-bold">{{ site_config.features_title or 'Powerful Tools for KDP Success' }}</h2>
+                <p class="lead text-muted">{{ site_config.features_subtitle or 'Everything you need to create, market, and sell your books on Amazon' }}</p>
+            </div>
+        </div>
+        
+        <div class="row g-4">
+            {% if available_tools %}
+                {% for tool_info in available_tools %}
+                    {% set tool = tool_info.config %}
+                    {% if tool and tool.is_enabled %}
+                    <div class="col-md-6 col-lg-3">
+                        <div class="feature-card h-100 p-4 text-center position-relative">
+                            <!-- Tool Status Indicators -->
+                            {% if not tool_info.available %}
+                                <div class="position-absolute top-0 end-0 p-2">
+                                    {% if 'premium' in tool_info.reason.lower() %}
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="fas fa-crown"></i> Premium
+                                        </span>
+                                    {% elif 'disabled' in tool_info.reason.lower() %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-pause"></i> Disabled
+                                        </span>
+                                    {% elif 'limit' in tool_info.reason.lower() %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle"></i> Limit Reached
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% elif tool.requires_paid_plan %}
+                                <div class="position-absolute top-0 end-0 p-2">
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-crown"></i> Premium
+                                    </span>
+                                </div>
+                            {% endif %}
+                            
+                            <div class="feature-icon mb-3">
+                                <i class="{{ tool.icon or 'fas fa-tool' }} text-primary" style="font-size: 3rem;"></i>
+                            </div>
+                            <h4>{{ tool.display_name }}</h4>
+                            <p class="text-muted">{{ tool.description or 'No description available' }}</p>
+                            
+                            <!-- Usage Statistics for Authenticated Users -->
+                            {% if current_user.is_authenticated and tool_info.usage_stats %}
+                                <div class="mt-3 pt-3 border-top">
+                                    <small class="text-muted">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Today: {{ tool_info.usage_stats.today_uses }}/{{ tool_info.usage_stats.daily_limit }}</span>
+                                            <span>Total: {{ tool_info.usage_stats.total_uses }}</span>
+                                        </div>
+                                        {% if tool_info.usage_stats.daily_limit > 0 %}
+                                            <div class="progress mt-2" style="height: 4px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ (tool_info.usage_stats.today_uses / tool_info.usage_stats.daily_limit * 100) if tool_info.usage_stats.daily_limit > 0 else 0 }}%">
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Action Button -->
+                            <div class="mt-3">
+                                {% if current_user.is_authenticated %}
+                                    {% if tool_info.available %}
+                                        <a href="{{ url_for('tools.' + tool.tool_name) }}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-play"></i> Use Tool
+                                        </a>
+                                    {% else %}
+                                        <!-- Disabled Tool Button with Flash Message -->
+                                        {% if 'disabled' in tool_info.reason.lower() %}
+                                            <button class="btn btn-secondary btn-sm disabled-tool-btn" 
+                                                    data-tool-name="{{ tool.display_name }}"
+                                                    data-reason="This tool is currently under maintenance. Please try again later."
+                                                    title="Tool is disabled">
+                                                <i class="fas fa-pause-circle"></i> Tool Disabled
+                                            </button>
+                                        {% elif 'premium' in tool_info.reason.lower() or tool.requires_paid_plan %}
+                                            <button class="btn btn-warning btn-sm premium-tool-btn" 
+                                                    data-tool-name="{{ tool.display_name }}"
+                                                    data-reason="This tool requires a premium subscription. Please upgrade your account."
+                                                    title="Premium tool">
+                                                <i class="fas fa-crown"></i> Premium Only
+                                            </button>
+                                        {% elif 'limit' in tool_info.reason.lower() %}
+                                            <button class="btn btn-danger btn-sm limit-tool-btn" 
+                                                    data-tool-name="{{ tool.display_name }}"
+                                                    data-reason="{{ tool_info.reason }}"
+                                                    title="Daily limit reached">
+                                                <i class="fas fa-exclamation-triangle"></i> Limit Reached
+                                            </button>
+                                        {% else %}
+                                            <button class="btn btn-secondary btn-sm disabled-tool-btn" 
+                                                    data-tool-name="{{ tool.display_name }}"
+                                                    data-reason="{{ tool_info.reason }}"
+                                                    title="{{ tool_info.reason }}">
+                                                <i class="fas fa-lock"></i> Not Available
+                                            </button>
+                                        {% endif %}
+                                    {% endif %}
+                                {% else %}
+                                    {% if tool.requires_paid_plan %}
+                                        <button class="btn btn-warning btn-sm premium-tool-btn" 
+                                                data-tool-name="{{ tool.display_name }}"
+                                                data-reason="Please login and upgrade to premium to access this tool."
+                                                title="Premium tool - Login required">
+                                            <i class="fas fa-crown"></i> Premium Tool
+                                        </button>
+                                    {% else %}
+                                        <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary btn-sm">
+                                            <i class="fas fa-sign-in-alt"></i> Login to Use
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <!-- Fallback static tools if no dynamic tools available -->
+                <div class="col-md-6 col-lg-3">
+                    <div class="feature-card h-100 p-4 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-heading text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Title Generator</h4>
+                        <p class="text-muted">Create compelling book titles that grab attention and drive sales.</p>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="feature-card h-100 p-4 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-align-left text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Description Generator</h4>
+                        <p class="text-muted">Write persuasive book descriptions that convert browsers into buyers.</p>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="feature-card h-100 p-4 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-search text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Keyword Research</h4>
+                        <p class="text-muted">Discover high-traffic keywords to improve your book's discoverability.</p>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 col-lg-3">
+                    <div class="feature-card h-100 p-4 text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-calculator text-primary" style="font-size: 3rem;"></i>
+                        </div>
+                        <h4>Royalty Calculator</h4>
+                        <p class="text-muted">Calculate your potential earnings and optimize your pricing strategy.</p>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+<!-- Pricing Section -->
+<section class="pricing-section py-5 bg-dark-subtle">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center mb-5">
+                <h2 class="h1 fw-bold">{{ site_config.pricing_title or 'Simple, Transparent Pricing' }}</h2>
+                <p class="lead text-muted">{{ site_config.pricing_subtitle or 'Choose the plan that works best for your publishing goals' }}</p>
+            </div>
+        </div>
+        
+        <div class="row justify-content-center g-4">
+            <!-- Free Plan -->
+            <div class="col-lg-4 col-md-6">
+                <div class="pricing-card h-100 p-4 text-center">
+                    <div class="pricing-header mb-4">
+                        <h3 class="h4 fw-bold">{{ free_plan_data.name or 'Free Plan' }}</h3>
+                        <div class="price">
+                            <span class="h2 fw-bold">{{ free_plan_data.price or '$0' }}</span>
+                            <span class="text-muted">{{ free_plan_data.period or '/forever' }}</span>
+                        </div>
+                    </div>
+                    <ul class="list-unstyled mb-4">
+                        {% for feature in free_plan_data.features %}
+                            {% if feature %}
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>{{ feature }}</li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                    {% if not current_user.is_authenticated %}
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-outline-primary w-100">{{ free_plan_data.button_text or 'Get Started Free' }}</a>
+                    {% elif current_user.subscription_type == 'free' %}
+                        <button class="btn btn-outline-primary w-100" disabled>{{ free_plan_data.current_button_text or 'Current Plan' }}</button>
+                    {% else %}
+                        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-primary w-100">Go to Dashboard</a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Paid Plan -->
+            <div class="col-lg-4 col-md-6">
+                <div class="pricing-card pricing-card-featured h-100 p-4 text-center position-relative">
+                    <div class="badge bg-primary position-absolute top-0 start-50 translate-middle px-3 py-2">
+                        Most Popular
+                    </div>
+                    <div class="pricing-header mb-4 mt-3">
+                        <h3 class="h4 fw-bold">{{ pro_plan_data.name or 'Pro Plan' }}</h3>
+                        <div class="price">
+                            <span class="h2 fw-bold">{{ pro_plan_data.price or '$15' }}</span>
+                            <span class="text-muted">{{ pro_plan_data.period or '/month' }}</span>
+                        </div>
+                    </div>
+                    <ul class="list-unstyled mb-4">
+                        {% for feature in pro_plan_data.features %}
+                            {% if feature %}
+                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>{{ feature }}</li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                    {% if not current_user.is_authenticated %}
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-primary w-100">{{ pro_plan_data.button_text or 'Upgrade Now' }}</a>
+                    {% elif current_user.subscription_type in ['monthly', 'yearly'] %}
+                        <button class="btn btn-primary w-100" disabled>{{ pro_plan_data.current_button_text or 'Current Plan' }}</button>
+                    {% else %}
+                        <a href="{{ url_for('plans') }}" class="btn btn-primary w-100">{{ pro_plan_data.button_text or 'Upgrade Now' }}</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="text-center mt-4">
+            <p class="text-muted">
+                <i class="fas fa-shield-alt me-1"></i>{{ pricing_guarantee_text or 'All plans include 30-day money-back guarantee' }}
+            </p>
+        </div>
+    </div>
+</section>
+
+<!-- CTA Section -->
+<section class="cta-section py-5">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8">
+                <h2 class="h1 fw-bold mb-4">{{ site_config.cta_title or 'Ready to Boost Your KDP Success?' }}</h2>
+                <p class="lead mb-4">
+                    {{ site_config.cta_subtitle or 'Join thousands of successful publishers who use our tools to create bestselling books on Amazon KDP.' }}
+                </p>
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-rocket me-2"></i>{{ button_texts.start_free_trial or 'Start Free Trial' }}
+                    </a>
+                    <a href="{{ url_for('plans') }}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-info-circle me-2"></i>{{ button_texts.view_pricing or 'View Pricing' }}
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('tools.dashboard') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Handle disabled and premium tool button clicks
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle disabled tool buttons
+    document.querySelectorAll('.disabled-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message
+            showFlashMessage('warning', `${toolName}: ${reason}`);
+            
+            // Add visual feedback
+            this.classList.add('btn-shake');
+            setTimeout(() => {
+                this.classList.remove('btn-shake');
+            }, 600);
+        });
+    });
+    
+    // Handle premium tool buttons
+    document.querySelectorAll('.premium-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message
+            showFlashMessage('info', `${toolName}: ${reason}`);
+            
+            // Add visual feedback
+            this.classList.add('btn-pulse');
+            setTimeout(() => {
+                this.classList.remove('btn-pulse');
+            }, 1000);
+        });
+    });
+    
+    // Handle limit reached buttons
+    document.querySelectorAll('.limit-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message
+            showFlashMessage('warning', `${toolName}: ${reason}`);
+            
+            // Add visual feedback
+            this.classList.add('btn-shake');
+            setTimeout(() => {
+                this.classList.remove('btn-shake');
+            }, 600);
+        });
+    });
+});
+
+// Function to show flash messages dynamically
+function showFlashMessage(type, message) {
+    // Remove existing flash messages
+    const existingFlashes = document.querySelectorAll('.dynamic-flash');
+    existingFlashes.forEach(flash => flash.remove());
+    
+    // Create new flash message
+    const flashDiv = document.createElement('div');
+    flashDiv.className = `alert alert-${type} alert-dismissible fade show dynamic-flash`;
+    flashDiv.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        max-width: 500px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    const iconMap = {
+        'warning': 'fas fa-exclamation-triangle',
+        'info': 'fas fa-info-circle',
+        'danger': 'fas fa-times-circle',
+        'success': 'fas fa-check-circle'
+    };
+    
+    flashDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="${iconMap[type] || 'fas fa-info-circle'} me-2"></i>
+            <div class="flex-grow-1">${message}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(flashDiv);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (flashDiv.parentNode) {
+            flashDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<style>
+/* Animation for disabled tool buttons */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.btn-shake {
+    animation: shake 0.6s ease-in-out;
+}
+
+.btn-pulse {
+    animation: pulse 1s ease-in-out;
+}
+
+/* Enhanced button styles */
+.disabled-tool-btn {
+    cursor: not-allowed !important;
+    opacity: 0.8;
+}
+
+.premium-tool-btn {
+    background: linear-gradient(45deg, #ffc107, #ff8f00) !important;
+    border: none !important;
+    color: #000 !important;
+    font-weight: 600;
+}
+
+.premium-tool-btn:hover {
+    background: linear-gradient(45deg, #ff8f00, #ffc107) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.3);
+}
+
+.limit-tool-btn {
+    background: linear-gradient(45deg, #dc3545, #c82333) !important;
+    border: none !important;
+    color: white !important;
+}
+
+.disabled-tool-btn:hover {
+    background: #6c757d !important;
+    transform: translateY(-1px);
+}
+
+/* Flash message animations */
+.dynamic-flash {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+</style>
+{% endblock %}

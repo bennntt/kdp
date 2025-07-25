@@ -1,0 +1,218 @@
+{% extends "admin/base.html" %}
+
+{% block page_title %}Pricing Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-light">Pricing Settings</h2>
+            <p class="text-muted mb-0">Configure subscription plans and daily usage limits</p>
+        </div>
+        <button class="btn btn-primary" onclick="savePricingSettings()">
+            <i class="fas fa-save me-2"></i>Save Settings
+        </button>
+    </div>
+
+    <!-- Pricing Configuration Cards -->
+    <div class="row">
+        <!-- Subscription Plans -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-credit-card me-2"></i>Subscription Plans
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Monthly Price ($)</label>
+                        <input type="number" class="form-control" id="monthly_price" 
+                               value="{{ pricing_configs.monthly_price }}" min="1" step="0.01">
+                        <div class="form-text">Price charged monthly for premium access</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Yearly Price ($)</label>
+                        <input type="number" class="form-control" id="yearly_price" 
+                               value="{{ pricing_configs.yearly_price }}" min="1" step="0.01">
+                        <div class="form-text">Price charged annually for premium access</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Currency</label>
+                        <select class="form-select" id="currency">
+                            <option value="USD" {{ 'selected' if pricing_configs.currency == 'USD' else '' }}>USD - US Dollar</option>
+                            <option value="EUR" {{ 'selected' if pricing_configs.currency == 'EUR' else '' }}>EUR - Euro</option>
+                            <option value="GBP" {{ 'selected' if pricing_configs.currency == 'GBP' else '' }}>GBP - British Pound</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Usage Limits -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-chart-bar me-2"></i>Usage Limits
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Free Daily Limit</label>
+                        <input type="number" class="form-control" id="free_daily_limit" 
+                               value="{{ pricing_configs.free_daily_limit }}" min="0">
+                        <div class="form-text">Daily tool usage limit for free users</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Premium Daily Limit</label>
+                        <input type="number" class="form-control" id="premium_daily_limit" 
+                               value="{{ pricing_configs.premium_daily_limit }}" min="1">
+                        <div class="form-text">Daily tool usage limit for premium users</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Trial Days</label>
+                        <input type="number" class="form-control" id="trial_days" 
+                               value="{{ pricing_configs.trial_days }}" min="0">
+                        <div class="form-text">Number of free trial days for new users</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Preview -->
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #ffecd2, #fcb69f);">
+                    <h5 class="mb-0 text-dark">
+                        <i class="fas fa-eye me-2"></i>Pricing Preview
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <div class="text-center p-3 border rounded">
+                                <h6 class="text-muted">Free Plan</h6>
+                                <h3 class="mb-2">$0</h3>
+                                <p class="mb-2">
+                                    <span id="preview_free_limit">{{ pricing_configs.free_daily_limit }}</span> daily uses
+                                </p>
+                                <small class="text-muted">No credit card required</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="text-center p-3 border rounded bg-light">
+                                <h6 class="text-primary">Monthly Plan</h6>
+                                <h3 class="mb-2">
+                                    <span id="preview_currency">{{ pricing_configs.currency }}</span>
+                                    <span id="preview_monthly">{{ pricing_configs.monthly_price }}</span>
+                                    <small>/month</small>
+                                </h3>
+                                <p class="mb-2">
+                                    <span id="preview_premium_limit">{{ pricing_configs.premium_daily_limit }}</span> daily uses
+                                </p>
+                                <small class="text-muted">Cancel anytime</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="text-center p-3 border rounded">
+                                <h6 class="text-success">Yearly Plan</h6>
+                                <h3 class="mb-2">
+                                    <span id="preview_currency_yearly">{{ pricing_configs.currency }}</span>
+                                    <span id="preview_yearly">{{ pricing_configs.yearly_price }}</span>
+                                    <small>/year</small>
+                                </h3>
+                                <p class="mb-2">
+                                    <span id="preview_premium_limit_yearly">{{ pricing_configs.premium_daily_limit }}</span> daily uses
+                                </p>
+                                <small class="text-success" id="yearly_savings">
+                                    Save ${{ (pricing_configs.monthly_price|float * 12 - pricing_configs.yearly_price|float)|round(2) }}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function updatePreview() {
+    const monthlyPrice = parseFloat(document.getElementById('monthly_price').value) || 0;
+    const yearlyPrice = parseFloat(document.getElementById('yearly_price').value) || 0;
+    const freeLimit = document.getElementById('free_daily_limit').value;
+    const premiumLimit = document.getElementById('premium_daily_limit').value;
+    const currency = document.getElementById('currency').value;
+    
+    // Update preview
+    document.getElementById('preview_monthly').textContent = monthlyPrice.toFixed(2);
+    document.getElementById('preview_yearly').textContent = yearlyPrice.toFixed(2);
+    document.getElementById('preview_free_limit').textContent = freeLimit;
+    document.getElementById('preview_premium_limit').textContent = premiumLimit;
+    document.getElementById('preview_premium_limit_yearly').textContent = premiumLimit;
+    document.getElementById('preview_currency').textContent = currency;
+    document.getElementById('preview_currency_yearly').textContent = currency;
+    
+    // Calculate yearly savings
+    const yearlySavings = (monthlyPrice * 12) - yearlyPrice;
+    document.getElementById('yearly_savings').textContent = `Save $${yearlySavings.toFixed(2)}`;
+}
+
+// Add event listeners for real-time preview updates
+document.addEventListener('DOMContentLoaded', function() {
+    ['monthly_price', 'yearly_price', 'free_daily_limit', 'premium_daily_limit', 'currency'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updatePreview);
+        document.getElementById(id).addEventListener('change', updatePreview);
+    });
+});
+
+function savePricingSettings() {
+    const data = {
+        monthly_price: document.getElementById('monthly_price').value,
+        yearly_price: document.getElementById('yearly_price').value,
+        free_daily_limit: document.getElementById('free_daily_limit').value,
+        premium_daily_limit: document.getElementById('premium_daily_limit').value,
+        trial_days: document.getElementById('trial_days').value,
+        currency: document.getElementById('currency').value
+    };
+    
+    fetch('/admin/pricing-settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('success', result.message);
+        } else {
+            showAlert('error', result.message);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Failed to save pricing settings');
+    });
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alert = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+    
+    document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alert);
+    
+    setTimeout(() => {
+        const alertElement = document.querySelector('.alert');
+        if (alertElement) alertElement.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

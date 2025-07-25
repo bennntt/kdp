@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Successful - KDP Tools{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="text-center mt-5">
+                <!-- Success Icon -->
+                <div class="success-icon mb-4">
+                    <i class="fas fa-check-circle text-success" style="font-size: 5rem;"></i>
+                </div>
+                
+                <!-- Success Message -->
+                <h1 class="h2 fw-bold text-success mb-3">Payment Successful!</h1>
+                <p class="lead text-muted mb-4">
+                    Thank you for subscribing to KDP Tools. Your payment has been processed successfully.
+                </p>
+                
+                <!-- Subscription Details -->
+                <div class="subscription-details p-4 bg-success bg-opacity-10 rounded mb-4">
+                    <h5 class="text-success mb-3">
+                        <i class="fas fa-star me-2"></i>Your Subscription is Now Active
+                    </h5>
+                    
+                    {% if current_user.is_authenticated %}
+                        <div class="row text-center">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Plan Type</h6>
+                                <span class="h5 text-primary">{{ current_user.subscription_type.title() }} Plan</span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Access Level</h6>
+                                <span class="h5 text-success">Unlimited</span>
+                            </div>
+                        </div>
+                        
+                        {% if current_user.subscription_end %}
+                            <div class="mt-3">
+                                <small class="text-muted">
+                                    Your subscription will renew on {{ current_user.subscription_end.strftime('%B %d, %Y') }}
+                                </small>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+                
+                <!-- What's Next -->
+                <div class="whats-next mb-4">
+                    <h5 class="mb-3">What's Next?</h5>
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="next-step p-3 border rounded h-100">
+                                <i class="fas fa-tools text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Explore Tools</h6>
+                                <small class="text-muted">Access all 8 KDP tools with unlimited usage</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="next-step p-3 border rounded h-100">
+                                <i class="fas fa-book text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Create Content</h6>
+                                <small class="text-muted">Generate titles, descriptions, and more</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="next-step p-3 border rounded h-100">
+                                <i class="fas fa-chart-line text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Track Progress</h6>
+                                <small class="text-muted">Monitor your publishing success</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <a href="{{ url_for('tools.dashboard') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                    <a href="{{ url_for('tools.settings') }}" class="btn btn-outline-secondary btn-lg">
+                        <i class="fas fa-cog me-2"></i>Manage Subscription
+                    </a>
+                </div>
+                
+                <!-- Support Information -->
+                <div class="support-info mt-5 p-4 bg-light rounded">
+                    <h6><i class="fas fa-headset me-2"></i>Need Help?</h6>
+                    <p class="text-muted small mb-2">
+                        As a paid subscriber, you now have access to priority support.
+                    </p>
+                    <a href="{{ url_for('contact') }}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-envelope me-1"></i>Contact Support
+                    </a>
+                </div>
+                
+                <!-- Email Confirmation -->
+                <div class="mt-4">
+                    <div class="alert alert-info">
+                        <i class="fas fa-envelope me-2"></i>
+                        <strong>Confirmation Email Sent</strong><br>
+                        <small>You'll receive a confirmation email with your subscription details shortly.</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confetti Animation (optional) -->
+<script>
+// Simple celebration effect
+document.addEventListener('DOMContentLoaded', function() {
+    // Create some simple visual celebration
+    const successIcon = document.querySelector('.success-icon i');
+    if (successIcon) {
+        successIcon.style.animation = 'pulse 2s infinite';
+    }
+});
+</script>
+
+<style>
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.next-step {
+    transition: transform 0.2s ease;
+}
+
+.next-step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+</style>
+{% endblock %}

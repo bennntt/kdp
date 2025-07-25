@@ -1,0 +1,233 @@
+{% extends "admin/base.html" %}
+
+{% block page_title %}API Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-light">API Settings</h2>
+            <p class="text-muted mb-0">Manage API keys and external service configurations</p>
+        </div>
+        <button class="btn btn-primary" onclick="saveApiSettings()">
+            <i class="fas fa-save me-2"></i>Save Settings
+        </button>
+    </div>
+
+    <!-- API Settings Cards -->
+    <div class="row">
+        <!-- OpenAI Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fab fa-openai me-2"></i>OpenAI API
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="openai_api_key" 
+                               value="{{ api_configs.openai_api_key }}" placeholder="sk-...">
+                        <div class="form-text">Used for advanced AI text generation</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword('openai_api_key')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="testApiKey('openai')">
+                            <i class="fas fa-check me-1"></i>Test
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- GROQ Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-brain me-2"></i>GROQ API
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="groq_api_key" 
+                               value="{{ api_configs.groq_api_key }}" placeholder="gsk_...">
+                        <div class="form-text">High-speed AI inference platform</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword('groq_api_key')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="testApiKey('groq')">
+                            <i class="fas fa-check me-1"></i>Test
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Google OAuth Settings -->
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #ffecd2, #fcb69f);">
+                    <h5 class="mb-0 text-dark">
+                        <i class="fab fa-google me-2"></i>Google OAuth Configuration
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Client ID</label>
+                            <input type="text" class="form-control" id="google_oauth_client_id" 
+                                   value="{{ api_configs.google_oauth_client_id }}" placeholder="...apps.googleusercontent.com">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Client Secret</label>
+                            <input type="password" class="form-control" id="google_oauth_client_secret" 
+                                   value="{{ api_configs.google_oauth_client_secret }}" placeholder="GOCSPX-...">
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Configure redirect URI: <code>{{ request.url_root }}google_login/callback</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SendGrid Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #a8c0ff, #3f2b96);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-envelope me-2"></i>SendGrid Email
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="sendgrid_api_key" 
+                               value="{{ api_configs.sendgrid_api_key }}" placeholder="SG...">
+                        <div class="form-text">Email delivery service</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword('sendgrid_api_key')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="testApiKey('sendgrid')">
+                            <i class="fas fa-check me-1"></i>Test
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trademark Search Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #667eea, #764ba2);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-shield-alt me-2"></i>Trademark API
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">API Key</label>
+                        <input type="password" class="form-control" id="trademark_api_key" 
+                               value="{{ api_configs.trademark_api_key }}" placeholder="API Key">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">API URL</label>
+                        <input type="url" class="form-control" id="trademark_api_url" 
+                               value="{{ api_configs.trademark_api_url }}" placeholder="https://api.trademark.com">
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="testApiKey('trademark')">
+                        <i class="fas fa-check me-1"></i>Test Connection
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+    field.setAttribute('type', type);
+}
+
+function testApiKey(service) {
+    // Show loading state
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+    button.disabled = true;
+    
+    // Simulate API test (replace with actual testing logic)
+    setTimeout(() => {
+        button.innerHTML = '<i class="fas fa-check me-1"></i>Valid';
+        button.className = 'btn btn-sm btn-success';
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-success';
+            button.disabled = false;
+        }, 2000);
+    }, 1500);
+}
+
+function saveApiSettings() {
+    const data = {
+        openai_api_key: document.getElementById('openai_api_key').value,
+        groq_api_key: document.getElementById('groq_api_key').value,
+        google_oauth_client_id: document.getElementById('google_oauth_client_id').value,
+        google_oauth_client_secret: document.getElementById('google_oauth_client_secret').value,
+        sendgrid_api_key: document.getElementById('sendgrid_api_key').value,
+        trademark_api_key: document.getElementById('trademark_api_key').value,
+        trademark_api_url: document.getElementById('trademark_api_url').value
+    };
+    
+    fetch('/admin/api-settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('success', result.message);
+        } else {
+            showAlert('error', result.message);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Failed to save settings');
+    });
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alert = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+    
+    document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alert);
+    
+    setTimeout(() => {
+        const alertElement = document.querySelector('.alert');
+        if (alertElement) alertElement.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

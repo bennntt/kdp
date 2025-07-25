@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription Plans - KDP Tools{% endblock %}
+
+{% block description %}Choose the perfect plan for your KDP publishing needs. Get unlimited access to all 8 professional tools with our affordable subscription plans.{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12 text-center mb-5 mt-4">
+            <h1 class="display-4 fw-bold">Choose Your Plan</h1>
+            <p class="lead text-muted">Select the perfect plan for your KDP publishing journey</p>
+            
+            <!-- Test Mode Notice -->
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="fas fa-flask me-2"></i>
+                <strong>Test Mode:</strong> This is a demo version. No real charges will be made. Use test card: 4242424242424242
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Current Plan Status (for logged in users) -->
+    {% if current_user.is_authenticated %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-info-circle me-3" style="font-size: 1.5rem;"></i>
+                        <div>
+                            <h6 class="mb-1">Current Plan: {{ current_user.subscription_type.title() }}</h6>
+                            <small>
+                                {% if current_user.subscription_type == 'free' %}
+                                    You have {{ 3 - current_user.daily_usage_count }} tool uses remaining today.
+                                {% elif current_user.subscription_end %}
+                                    Your subscription is active until {{ current_user.subscription_end.strftime('%B %d, %Y') }}.
+                                {% else %}
+                                    Unlimited access to all tools.
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+    
+    <div class="row justify-content-center g-4">
+        <!-- Free Plan -->
+        <div class="col-lg-4 col-md-6">
+            <div class="pricing-card h-100 p-4 text-center">
+                <div class="pricing-header mb-4">
+                    <h3 class="h4 fw-bold">{{ free_plan_data.name or 'Free Plan' }}</h3>
+                    <div class="price mb-2">
+                        <span class="h1 fw-bold text-success">{{ free_plan_data.price or '$0' }}</span>
+                        <span class="text-muted">{{ free_plan_data.period or '/forever' }}</span>
+                    </div>
+                    <p class="text-muted small">Perfect for getting started</p>
+                </div>
+                
+                <ul class="list-unstyled mb-4 text-start">
+                    {% for feature in free_plan_data.features %}
+                        {% if feature %}
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                {% if loop.index == 1 %}<strong>{{ feature }}</strong>{% else %}{{ feature }}{% endif %}
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+                
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-outline-success w-100">
+                        <i class="fas fa-rocket me-2"></i>{{ free_plan_data.button_text or 'Get Started Free' }}
+                    </a>
+                {% elif current_user.subscription_type == 'free' %}
+                    <button class="btn btn-outline-success w-100" disabled>
+                        <i class="fas fa-check me-2"></i>{{ free_plan_data.current_button_text or 'Current Plan' }}
+                    </button>
+                {% else %}
+                    <form method="POST" action="{{ url_for('payments.cancel_subscription') }}">
+                        <button type="submit" class="btn btn-outline-secondary w-100" 
+                                onclick="return confirm('Are you sure you want to downgrade to the free plan?')">
+                            <i class="fas fa-arrow-down me-2"></i>Downgrade
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Monthly Plan -->
+        <div class="col-lg-4 col-md-6">
+            <div class="pricing-card pricing-card-featured h-100 p-4 text-center position-relative">
+                <div class="badge bg-primary position-absolute top-0 start-50 translate-middle px-3 py-2">
+                    Most Popular
+                </div>
+                
+                <div class="pricing-header mb-4 mt-3">
+                    <h3 class="h4 fw-bold">{{ pro_plan_data.name or 'Pro Plan' }}</h3>
+                    <div class="price mb-2">
+                        <span class="h1 fw-bold text-primary">{{ pro_plan_data.price or '$15' }}</span>
+                        <span class="text-muted">{{ pro_plan_data.period or '/month' }}</span>
+                    </div>
+                    <p class="text-muted small">For active publishers</p>
+                </div>
+                
+                <ul class="list-unstyled mb-4 text-start">
+                    {% for feature in pro_plan_data.features %}
+                        {% if feature %}
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                {% if loop.index == 1 %}<strong>{{ feature }}</strong>{% else %}{{ feature }}{% endif %}
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                </ul>
+                
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary w-100">
+                        <i class="fas fa-credit-card me-2"></i>{{ pro_plan_data.button_text or 'Upgrade Now' }}
+                    </a>
+                {% elif current_user.subscription_type == 'monthly' %}
+                    <button class="btn btn-primary w-100" disabled>
+                        <i class="fas fa-check me-2"></i>{{ pro_plan_data.current_button_text or 'Current Plan' }}
+                    </button>
+                {% else %}
+                    <form method="POST" action="{{ url_for('payments.create_checkout_session') }}">
+                        <input type="hidden" name="plan_type" value="monthly">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-credit-card me-2"></i>
+                            {% if current_user.subscription_type == 'free' %}Subscribe{% else %}Switch Plan{% endif %}
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+        
+
+    </div>
+    
+    <!-- Guarantee Text -->
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <p class="text-muted">
+                <i class="fas fa-shield-alt me-1"></i>{{ pricing_guarantee_text or 'All plans include 30-day money-back guarantee' }}
+            </p>
+        </div>
+    </div>
+    
+    <!-- Features Comparison -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="text-center mb-4">Feature Comparison</h3>
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Feature</th>
+                            <th class="text-center">Free</th>
+                            <th class="text-center">Monthly</th>
+
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><strong>Daily Tool Uses</strong></td>
+                            <td class="text-center">3 per day</td>
+                            <td class="text-center"><i class="fas fa-infinity text-success"></i> Unlimited</td>
+                        </tr>
+                        <tr>
+                            <td><strong>All 8 KDP Tools</strong></td>
+                            <td class="text-center"><i class="fas fa-check text-success"></i></td>
+                            <td class="text-center"><i class="fas fa-check text-success"></i></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Email Support</strong></td>
+                            <td class="text-center">Standard</td>
+                            <td class="text-center">Priority</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Export Results</strong></td>
+                            <td class="text-center"><i class="fas fa-check text-success"></i></td>
+                            <td class="text-center"><i class="fas fa-check text-success"></i></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Usage Analytics</strong></td>
+                            <td class="text-center">Basic</td>
+                            <td class="text-center">Advanced</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Money Back Guarantee</strong></td>
+                            <td class="text-center">N/A</td>
+                            <td class="text-center"><i class="fas fa-shield-alt me-1"></i>{{ pricing_guarantee_text or '30 days' }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- FAQ Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="text-center mb-4">Frequently Asked Questions</h3>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>Can I cancel anytime?</h6>
+                        <p class="text-muted small">Yes, you can cancel your subscription at any time. Your access continues until the end of your billing period.</p>
+                    </div>
+                    
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>Is there a free trial?</h6>
+                        <p class="text-muted small">Our free plan serves as a trial with 3 daily tool uses. You can upgrade anytime for unlimited access.</p>
+                    </div>
+                    
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>Do you offer refunds?</h6>
+                        <p class="text-muted small">Yes, {{ pricing_guarantee_text or 'we offer a 30-day money-back guarantee' }} for all paid plans. Contact support for refund requests.</p>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>Can I switch plans?</h6>
+                        <p class="text-muted small">Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately or at the next billing cycle.</p>
+                    </div>
+                    
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>What payment methods do you accept?</h6>
+                        <p class="text-muted small">We accept all major credit cards and debit cards through our secure Stripe payment processor.</p>
+                    </div>
+                    
+                    <div class="faq-item mb-4">
+                        <h6><i class="fas fa-question-circle text-primary me-2"></i>Is my data secure?</h6>
+                        <p class="text-muted small">Yes, we use industry-standard encryption and security measures to protect your data and payment information.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CTA Section -->
+    <div class="row mt-5 mb-5">
+        <div class="col-12 text-center">
+            <div class="cta-section p-5 bg-primary bg-opacity-10 rounded">
+                <h4 class="mb-3">Ready to Boost Your KDP Success?</h4>
+                <p class="text-muted mb-4">Join thousands of successful publishers using our tools to create bestselling books.</p>
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-rocket me-2"></i>{{ button_texts.start_free_today or 'Start Free Today' }}
+                    </a>
+                    <a href="{{ url_for('contact') }}" class="btn btn-outline-primary btn-lg">
+                        <i class="fas fa-envelope me-2"></i>Contact Sales
+                    </a>
+                {% else %}
+                    <a href="{{ url_for('tools.dashboard') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

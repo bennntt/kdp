@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}Subtitle Generator - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-text-height me-2 text-primary"></i>Subtitle Generator
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Book Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control", placeholder="Enter your book title") }}
+                        {% if form.title.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.title.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.book_type.label(class="form-label") }}
+                        {{ form.book_type(class="form-select") }}
+                        {% if form.book_type.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.book_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.language.label(class="form-label") }}
+                        {{ form.language(class="form-select") }}
+                        {% if form.language.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.language.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.keywords.label(class="form-label") }}
+                        {{ form.keywords(class="form-control", placeholder="Enter keywords separated by commas") }}
+                        {% if form.keywords.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.keywords.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-magic me-2"></i>Generate Subtitles
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if results %}
+<div class="subtitle-results-anchor" id="subtitle-results"></div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Generated Subtitles
+                    <span class="badge bg-success ms-2">{{ results|length }} subtitles</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for subtitle in results %}
+                        <div class="col-md-6 mb-3">
+                            <div class="result-item-hover p-3 border rounded d-flex justify-content-between align-items-center">
+                                <span class="fw-medium">{{ subtitle }}</span>
+                                <button class="btn btn-sm btn-outline-primary" id="copyBtn-{{ loop.index }}" onclick="copyToClipboard('{{ subtitle|replace("'", "\\'") }}', 'copyBtn-{{ loop.index }}')">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+
+<style>
+.result-item-hover {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.result-item-hover:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Anchor positioning fix */
+.subtitle-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+</style>
+
+<script>
+function copyToClipboard(text, buttonId) {
+    navigator.clipboard.writeText(text).then(function() {
+        const button = document.getElementById(buttonId);
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied';
+        button.classList.remove('btn-outline-primary');
+        button.classList.add('btn-success');
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-primary');
+        }, 2000);
+    });
+}
+
+
+
+// Subtitle generator functionality with scroll to results
+document.addEventListener('DOMContentLoaded', function() {
+    {% if results %}
+        // Scroll to results if they exist
+        setTimeout(function() {
+            const resultsElement = document.getElementById('subtitle-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+</script>
+{% endblock %}

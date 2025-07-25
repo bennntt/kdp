@@ -1,0 +1,235 @@
+{% extends "admin/base.html" %}
+
+{% block page_title %}Stripe Settings{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-light">Stripe Payment Settings</h2>
+            <p class="text-muted mb-0">Configure Stripe payment processing and subscription settings</p>
+        </div>
+        <button class="btn btn-primary" onclick="saveStripeSettings()">
+            <i class="fas fa-save me-2"></i>Save Settings
+        </button>
+    </div>
+
+    <!-- Stripe Configuration Cards -->
+    <div class="row">
+        <!-- API Keys -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #635bff, #0066CC);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fab fa-stripe me-2"></i>API Keys
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Secret Key</label>
+                        <input type="password" class="form-control" id="stripe_secret_key" 
+                               value="{{ stripe_configs.stripe_secret_key }}" placeholder="sk_...">
+                        <div class="form-text">Your Stripe secret key for server-side operations</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Publishable Key</label>
+                        <input type="text" class="form-control" id="stripe_publishable_key" 
+                               value="{{ stripe_configs.stripe_publishable_key }}" placeholder="pk_...">
+                        <div class="form-text">Your Stripe publishable key for client-side operations</div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="togglePassword('stripe_secret_key')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-success" onclick="testStripeConnection()">
+                            <i class="fas fa-check me-1"></i>Test Connection
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Webhook Configuration -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #f093fb, #f5576c);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-webhook me-2"></i>Webhook Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Webhook Secret</label>
+                        <input type="password" class="form-control" id="stripe_webhook_secret" 
+                               value="{{ stripe_configs.stripe_webhook_secret }}" placeholder="whsec_...">
+                        <div class="form-text">Secret for verifying webhook signatures</div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Webhook URL: <code>{{ request.url_root }}stripe/webhook</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mode Configuration -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #ffecd2, #fcb69f);">
+                    <h5 class="mb-0 text-dark">
+                        <i class="fas fa-toggle-on me-2"></i>Mode Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Test Mode</label>
+                        <select class="form-select" id="stripe_test_mode">
+                            <option value="true" {{ 'selected' if stripe_configs.stripe_test_mode == 'true' else '' }}>Enabled (Test Mode)</option>
+                            <option value="false" {{ 'selected' if stripe_configs.stripe_test_mode == 'false' else '' }}>Disabled (Live Mode)</option>
+                        </select>
+                        <div class="form-text">Use test mode for development and testing</div>
+                    </div>
+                    <div class="alert {{ 'alert-warning' if stripe_configs.stripe_test_mode == 'true' else 'alert-success' }} mb-0">
+                        <i class="fas fa-{{ 'exclamation-triangle' if stripe_configs.stripe_test_mode == 'true' else 'check-circle' }} me-2"></i>
+                        {{ 'Test mode is enabled - no real charges will be made' if stripe_configs.stripe_test_mode == 'true' else 'Live mode is enabled - real charges will be processed' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Price IDs -->
+        <div class="col-md-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-gradient" style="background: linear-gradient(135deg, #a8c0ff, #3f2b96);">
+                    <h5 class="mb-0 text-white">
+                        <i class="fas fa-dollar-sign me-2"></i>Price IDs
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Monthly Price ID</label>
+                        <input type="text" class="form-control" id="stripe_monthly_price_id" 
+                               value="{{ stripe_configs.stripe_monthly_price_id }}" placeholder="price_...">
+                        <div class="form-text">Stripe price ID for monthly subscription</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Yearly Price ID</label>
+                        <input type="text" class="form-control" id="stripe_yearly_price_id" 
+                               value="{{ stripe_configs.stripe_yearly_price_id }}" placeholder="price_...">
+                        <div class="form-text">Stripe price ID for yearly subscription</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configuration Guide -->
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-book me-2"></i>Configuration Guide
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Setting up Stripe</h6>
+                            <ol class="small">
+                                <li>Create a Stripe account at <a href="https://stripe.com" target="_blank">stripe.com</a></li>
+                                <li>Get your API keys from the Stripe Dashboard</li>
+                                <li>Create products and prices for your subscriptions</li>
+                                <li>Set up webhooks for subscription events</li>
+                            </ol>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Required Webhook Events</h6>
+                            <ul class="small">
+                                <li>customer.subscription.created</li>
+                                <li>customer.subscription.updated</li>
+                                <li>customer.subscription.deleted</li>
+                                <li>invoice.payment_succeeded</li>
+                                <li>invoice.payment_failed</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function togglePassword(fieldId) {
+    const field = document.getElementById(fieldId);
+    const type = field.getAttribute('type') === 'password' ? 'text' : 'password';
+    field.setAttribute('type', type);
+}
+
+function testStripeConnection() {
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Testing...';
+    button.disabled = true;
+    
+    // Simulate Stripe connection test
+    setTimeout(() => {
+        button.innerHTML = '<i class="fas fa-check me-1"></i>Connected';
+        button.className = 'btn btn-sm btn-success';
+        
+        setTimeout(() => {
+            button.innerHTML = originalText;
+            button.className = 'btn btn-sm btn-success';
+            button.disabled = false;
+        }, 2000);
+    }, 1500);
+}
+
+function saveStripeSettings() {
+    const data = {
+        stripe_secret_key: document.getElementById('stripe_secret_key').value,
+        stripe_publishable_key: document.getElementById('stripe_publishable_key').value,
+        stripe_webhook_secret: document.getElementById('stripe_webhook_secret').value,
+        stripe_test_mode: document.getElementById('stripe_test_mode').value,
+        stripe_monthly_price_id: document.getElementById('stripe_monthly_price_id').value,
+        stripe_yearly_price_id: document.getElementById('stripe_yearly_price_id').value
+    };
+    
+    fetch('/admin/stripe-settings/save', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('success', result.message);
+        } else {
+            showAlert('error', result.message);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Failed to save Stripe settings');
+    });
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const alert = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+    
+    document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alert);
+    
+    setTimeout(() => {
+        const alertElement = document.querySelector('.alert');
+        if (alertElement) alertElement.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

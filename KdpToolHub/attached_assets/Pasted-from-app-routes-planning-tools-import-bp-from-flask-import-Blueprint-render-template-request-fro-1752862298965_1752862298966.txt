@@ -1,0 +1,119 @@
+from app.routes.planning_tools import bp
+from flask import Blueprint, render_template, request
+from flask_login import login_required
+import requests
+
+CURRENCY_SYMBOLS = {
+    'USD': '$', 'GBP': '£', 'EUR': '€', 'PLN': 'zł',
+    'SEK': 'kr', 'JPY': '¥', 'CAD': '$', 'AUD': '$'
+}
+
+PRINTING_COSTS = {
+    'paperback': {
+        'black_white': {'base': 0.85, 'per_page': 0.010},
+        'standard_color': {'base': 3.65, 'per_page': 0.07},
+        'premium_color': {'base': 3.99, 'per_page': 0.09}
+    },
+    'hardcover': {
+        'black_white': {'base': 3.59, 'per_page': 0.012},
+        'standard_color': {'base': 5.65, 'per_page': 0.10},
+        'premium_color': {'base': 6.00, 'per_page': 0.12}
+    }
+}
+
+MARKETPLACES = {
+    'Amazon.com':     {'currency': 'USD', 'threshold': 9.99},
+    'Amazon.co.uk':   {'currency': 'GBP', 'threshold': 7.99},
+    'Amazon.de':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.fr':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.es':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.it':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.nl':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.pl':      {'currency': 'PLN', 'threshold': 40.0},
+    'Amazon.se':      {'currency': 'SEK', 'threshold': 99.0},
+    'Amazon.co.jp':   {'currency': 'JPY', 'threshold': 1000},
+    'Amazon.ca':      {'currency': 'CAD', 'threshold': 13.99},
+    'Amazon.com.au':  {'currency': 'AUD', 'threshold': 13.99},
+}
+
+@bp.route('/royalty-calculator', methods=['GET', 'POST'])
+@login_required
+def royalty_calculator():
+    results = []
+    list_price = 0.0
+    page_count = 0
+    error_message = None
+
+    # القيم الافتراضية
+    selected_marketplace = 'Amazon.com'
+    selected_book_type = 'paperback'
+    selected_interior_type = 'black_white'
+    selected_trim_size = '5x8'
+    base_currency = MARKETPLACES[selected_marketplace]['currency']
+
+    if request.method == 'POST':
+        try:
+            list_price = float(request.form.get('list_price', 0))
+            page_count = int(request.form.get('page_count', 0))
+            selected_marketplace = request.form.get('marketplace', 'Amazon.com')
+            selected_book_type = request.form.get('book_type', 'paperback')
+            selected_interior_type = request.form.get('interior_type', 'black_white')
+            selected_trim_size = request.form.get('trim_size', '5x8')
+            base_currency = MARKETPLACES[selected_marketplace]['currency']
+        except ValueError:
+            pass
+
+        # جلب أسعار الصرف
+        fx_url = f"https://api.frankfurter.app/latest?from={base_currency}"
+        try:
+            fx_data = requests.get(fx_url).json().get('rates', {})
+            fx_data[base_currency] = 1.0
+        except Exception:
+            fx_data = {base_currency: 1.0}
+
+        # حساب تكلفة الطباعة للسوق المحدد للتحقق من الحد الأدنى
+        cost = PRINTING_COSTS[selected_book_type][selected_interior_type]
+        printing_cost_selected = round(cost['base'] + (page_count * cost['per_page']), 2)
+        royalty_rate_selected = 0.60 if list_price >= MARKETPLACES[selected_marketplace]['threshold'] else 0.50
+        min_required_price = round(printing_cost_selected / royalty_rate_selected, 2)
+
+        if list_price < min_required_price:
+            error_message = f"The list price for {selected_marketplace} must be at least {min_required_price:.2f} {base_currency} to cover printing costs."
+
+        ordered_marketplaces = [selected_marketplace] + [m for m in MARKETPLACES if m != selected_marketplace]
+
+        if not error_message:
+            for market in ordered_marketplaces:
+                data = MARKETPLACES[market]
+                currency = data['currency']
+                symbol = CURRENCY_SYMBOLS.get(currency, '')
+                rate = fx_data.get(currency, 1.0)
+
+                printing_cost = round(cost['base'] + (page_count * cost['per_page']), 2)
+                converted_price = round(list_price * rate, 2)
+                royalty_rate = 0.60 if converted_price >= data['threshold'] else 0.50
+                estimated_royalty = round((converted_price * royalty_rate) - printing_cost, 2)
+                min_list_price = round(printing_cost / royalty_rate, 2)
+
+                results.append({
+                    'marketplace': market,
+                    'currency': currency,
+                    'list_price': f"{symbol} {converted_price:.2f}",
+                    'royalty_rate': f"{int(royalty_rate * 100)}%",
+                    'min_price': f"{symbol} {min_list_price:.2f}",
+                    'printing_cost': f"{symbol} {printing_cost:.2f}",
+                    'estimated_royalty': f"{symbol} {estimated_royalty:.2f}"
+                })
+
+    return render_template(
+        'planning_tools/royalty_calculator.html',
+        active_section='Royalty Calculator',
+        royalty_table=results,
+        input_list_price=list_price,
+        input_page_count=page_count,
+        selected_marketplace=selected_marketplace,
+        selected_book_type=selected_book_type,
+        selected_interior_type=selected_interior_type,
+        selected_trim_size=selected_trim_size,
+        error_message=error_message
+    )

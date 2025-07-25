@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}Description Generator - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-align-left me-2 text-primary"></i>Description Generator
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Book Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.title.label(class="form-label") }}
+                        {{ form.title(class="form-control", placeholder="Enter your book title") }}
+                        {% if form.title.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.title.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.language.label(class="form-label") }}
+                        {{ form.language(class="form-select") }}
+                        {% if form.language.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.language.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.keywords.label(class="form-label") }}
+                        {{ form.keywords(class="form-control", placeholder="Enter keywords separated by commas") }}
+                        {% if form.keywords.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.keywords.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Optional Fields Toggle -->
+                    <div class="mb-3">
+                        <label class="form-label">Include Additional Book Details (Optional)</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeBindingType">
+                            <label class="form-check-label" for="includeBindingType">
+                                Binding Type
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeInteriorType">
+                            <label class="form-check-label" for="includeInteriorType">
+                                Interior Type
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includePageCount">
+                            <label class="form-check-label" for="includePageCount">
+                                Page Count
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="includeTrimSize">
+                            <label class="form-check-label" for="includeTrimSize">
+                                Interior Trim Size
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3" id="bindingTypeField" style="display: none;">
+                        {{ form.binding_type.label(class="form-label") }}
+                        {{ form.binding_type(class="form-select") }}
+                        {% if form.binding_type.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.binding_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3" id="interiorTypeField" style="display: none;">
+                        {{ form.interior_type.label(class="form-label") }}
+                        {{ form.interior_type(class="form-select") }}
+                        {% if form.interior_type.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.interior_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3" id="pageCountField" style="display: none;">
+                        {{ form.page_count.label(class="form-label") }}
+                        {{ form.page_count(class="form-control", placeholder="e.g., 250") }}
+                        {% if form.page_count.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.page_count.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3" id="trimSizeField" style="display: none;">
+                        {{ form.interior_trim_size.label(class="form-label") }}
+                        {{ form.interior_trim_size(class="form-select") }}
+                        {% if form.interior_trim_size.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.interior_trim_size.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label text-light mb-2">Length of description:
+                            <span id="length-label" class="ms-2 text-primary fw-medium">Medium</span>
+                        </label>
+                        <input type="range" name="description_length" min="1" max="3" step="1" value="2" 
+                               class="form-range" id="length-slider">
+                        <div class="d-flex justify-content-between small text-muted mt-1">
+                            <span>Short</span>
+                            <span>Medium</span>
+                            <span>Long</span>
+                        </div>
+                        {% if form.description_length.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.description_length.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-magic me-2"></i>Generate Descriptions
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if results %}
+<div class="description-results-anchor" id="description-results"></div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Generated Descriptions
+                    <span class="badge bg-success ms-2">{{ results|length }} descriptions</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="results-container">
+                    {% for description in results %}
+                        <div class="result-item border rounded mb-4">
+                            <div class="card-header bg-transparent">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6 class="mb-0">Description {{ loop.index }}</h6>
+                                    <div>
+                                        <small class="text-muted me-3">{{ description|length }} chars (HTML)</small>
+                                        <button class="btn btn-sm btn-outline-secondary copy-btn" 
+                                                data-text="{{ description|e }}" 
+                                                data-id="copyBtn-{{ loop.index }}" 
+                                                id="copyBtn-{{ loop.index }}">
+                                            <i class="fas fa-copy"></i> Copy
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-0" id="desc-{{ loop.index }}">{{ description|safe }}</div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.result-item {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.result-item:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Anchor positioning fix */
+.description-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+
+/* HTML Description Styling */
+.card-body div {
+    line-height: 1.6;
+}
+
+.card-body div p {
+    margin-bottom: 1rem;
+    color: #e9ecef;
+}
+
+.card-body div b {
+    color: #e9ecef;
+    font-weight: 600;
+}
+
+.card-body div i {
+    color: #e9ecef;
+    font-style: italic;
+}
+
+.card-body div ul {
+    margin: 1rem 0;
+    padding-left: 1.5rem;
+}
+
+.card-body div li {
+    margin-bottom: 0.5rem;
+    color: #e9ecef;
+}
+</style>
+
+
+
+<script>
+// Length slider functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const slider = document.getElementById('length-slider');
+    const label = document.getElementById('length-label');
+    const lengthOptions = ['Short', 'Medium', 'Long'];
+    
+    function updateSlider() {
+        const value = parseInt(slider.value);
+        label.textContent = lengthOptions[value - 1];
+    }
+    
+    slider.addEventListener('input', updateSlider);
+    updateSlider(); // Initialize
+    
+    // Optional fields toggle functionality
+    const checkboxes = {
+        'includeBindingType': 'bindingTypeField',
+        'includeInteriorType': 'interiorTypeField', 
+        'includePageCount': 'pageCountField',
+        'includeTrimSize': 'trimSizeField'
+    };
+    
+    Object.keys(checkboxes).forEach(checkboxId => {
+        const checkbox = document.getElementById(checkboxId);
+        const field = document.getElementById(checkboxes[checkboxId]);
+        
+        checkbox.addEventListener('change', function() {
+            if (this.checked) {
+                field.style.display = 'block';
+            } else {
+                field.style.display = 'none';
+                // Clear the field value when hidden
+                const input = field.querySelector('select, input');
+                if (input) {
+                    if (input.tagName === 'SELECT') {
+                        input.selectedIndex = 0;
+                    } else {
+                        input.value = '';
+                    }
+                }
+            }
+        });
+    });
+    
+    {% if results %}
+        // Scroll to results if they exist
+        setTimeout(function() {
+            const resultsElement = document.getElementById('description-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+
+// Simple copy function using event delegation
+document.addEventListener('click', function(e) {
+    if (e.target.closest('.copy-btn')) {
+        e.preventDefault();
+        const button = e.target.closest('.copy-btn');
+        const text = button.dataset.text;
+        
+        // Create temporary textarea for copying
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                const originalContent = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i> Copied!';
+                button.classList.remove('btn-outline-secondary');
+                button.classList.add('btn-success');
+                
+                setTimeout(() => {
+                    button.innerHTML = originalContent;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-secondary');
+                }, 2000);
+            }
+        } catch (err) {
+            console.error('Copy failed:', err);
+            button.innerHTML = '<i class="fas fa-times"></i> Failed';
+        } finally {
+            document.body.removeChild(textarea);
+        }
+    }
+});
+
+
+</script>
+{% endblock %}

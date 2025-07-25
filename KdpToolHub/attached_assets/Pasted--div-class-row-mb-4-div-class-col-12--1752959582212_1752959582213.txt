@@ -1,0 +1,30 @@
+<div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Version:</strong><br>
+                                                            <span class="text-muted">2.0.0</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Last Updated:</strong><br>
+                                                            <span class="text-muted">July 2025</span>
+                                                        </div>
+                                                        <div class="col-12 mb-3">
+                                                            <strong>Description:</strong><br>
+                                                            <span class="text-muted">KDP Tools is a comprehensive platform that provides essential tools for Amazon Kindle Direct Publishing authors. Our suite includes title generators, keyword research, royalty calculators, and more to help streamline your publishing workflow.</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Total Tools:</strong><br>
+                                                            <span class="text-muted">8 Professional Tools</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Support:</strong><br>
+                                                            <span class="text-muted">24/7 Customer Support</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>

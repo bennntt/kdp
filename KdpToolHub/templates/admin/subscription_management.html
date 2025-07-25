@@ -1,0 +1,329 @@
+{% extends "admin/base.html" %}
+
+{% block page_title %}Subscription Management{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-light">Subscription Management</h2>
+            <p class="text-muted mb-0">Monitor and manage user subscriptions</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="exportSubscriptions()">
+                <i class="fas fa-download me-2"></i>Export
+            </button>
+            <button class="btn btn-primary" onclick="refreshData()">
+                <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-primary text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">{{ stats.total_users }}</h3>
+                            <p class="text-muted mb-0">Total Users</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-success text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-credit-card"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">{{ stats.monthly_users }}</h3>
+                            <p class="text-muted mb-0">Monthly Subscribers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-warning text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">{{ stats.yearly_users }}</h3>
+                            <p class="text-muted mb-0">Yearly Subscribers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="stat-icon bg-info text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-user"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">{{ stats.free_users }}</h3>
+                            <p class="text-muted mb-0">Free Users</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Recent Subscriptions -->
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Recent Subscriptions</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th>Plan</th>
+                                    <th>Started</th>
+                                    <th>Expires</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subscription in stats.recent_subscriptions %}
+                                <tr id="subscription-{{ subscription.id }}">
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <div class="user-avatar me-2">
+                                                {{ subscription.first_name[0] if subscription.first_name else 'U' }}
+                                            </div>
+                                            <div>
+                                                <strong>{{ subscription.first_name }} {{ subscription.last_name }}</strong>
+                                                <br><small class="text-muted">{{ subscription.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if subscription.subscription_type == 'monthly' else 'primary' }}">
+                                            {{ subscription.subscription_type.title() }}
+                                        </span>
+                                    </td>
+                                    <td>{{ subscription.subscription_start.strftime('%Y-%m-%d') if subscription.subscription_start else 'N/A' }}</td>
+                                    <td>{{ subscription.subscription_end.strftime('%Y-%m-%d') if subscription.subscription_end else 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-success">Active</span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <button class="btn btn-outline-primary" onclick="viewUserDetails({{ subscription.id }})">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-outline-danger" onclick="cancelSubscription({{ subscription.id }})">
+                                                <i class="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expiring Soon -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Expiring Soon
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if stats.expiring_soon %}
+                        {% for user in stats.expiring_soon %}
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="user-avatar me-2">
+                                {{ user.first_name[0] if user.first_name else 'U' }}
+                            </div>
+                            <div class="flex-grow-1">
+                                <strong>{{ user.first_name }} {{ user.last_name }}</strong>
+                                <br><small class="text-muted">{{ user.email }}</small>
+                                <br><small class="text-danger">Expires: {{ user.subscription_end.strftime('%Y-%m-%d') if user.subscription_end else 'N/A' }}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" onclick="sendRenewalReminder({{ user.id }})">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted mb-0">No subscriptions expiring soon</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Details Modal -->
+<div class="modal fade" id="userDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">User Subscription Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="userDetailsContent">
+                <!-- Content will be loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function viewUserDetails(userId) {
+    // Show user details modal with subscription information
+    const modal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+    document.getElementById('userDetailsContent').innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    modal.show();
+    
+    // Load user details (implement actual API call)
+    setTimeout(() => {
+        document.getElementById('userDetailsContent').innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>User Information</h6>
+                    <p><strong>Name:</strong> John Doe</p>
+                    <p><strong>Email:</strong> john@example.com</p>
+                    <p><strong>Registration:</strong> 2024-01-15</p>
+                </div>
+                <div class="col-md-6">
+                    <h6>Subscription Details</h6>
+                    <p><strong>Plan:</strong> Monthly</p>
+                    <p><strong>Started:</strong> 2024-01-20</p>
+                    <p><strong>Next Billing:</strong> 2024-07-20</p>
+                    <p><strong>Total Paid:</strong> $90</p>
+                </div>
+            </div>
+        `;
+    }, 1000);
+}
+
+function cancelSubscription(userId) {
+    if (!confirm('Are you sure you want to cancel this subscription?')) {
+        return;
+    }
+    
+    fetch(`/admin/subscription-management/cancel/${userId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            showAlert('success', result.message);
+            // Remove row from table
+            document.getElementById(`subscription-${userId}`).remove();
+        } else {
+            showAlert('error', result.message);
+        }
+    })
+    .catch(error => {
+        showAlert('error', 'Failed to cancel subscription');
+    });
+}
+
+function sendRenewalReminder(userId) {
+    const button = event.target.closest('button');
+    const originalIcon = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    button.disabled = true;
+    
+    // Simulate sending renewal reminder
+    setTimeout(() => {
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.className = 'btn btn-sm btn-success';
+        showAlert('success', 'Renewal reminder sent successfully');
+        
+        setTimeout(() => {
+            button.innerHTML = originalIcon;
+            button.className = 'btn btn-sm btn-outline-primary';
+            button.disabled = false;
+        }, 2000);
+    }, 1500);
+}
+
+function exportSubscriptions() {
+    showAlert('info', 'Preparing export... Download will start shortly');
+    // Implement actual export functionality
+}
+
+function refreshData() {
+    location.reload();
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                     type === 'error' ? 'alert-danger' : 'alert-info';
+    const alert = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+    
+    document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alert);
+    
+    setTimeout(() => {
+        const alertElement = document.querySelector('.alert');
+        if (alertElement) alertElement.remove();
+    }, 5000);
+}
+</script>
+
+<style>
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.stat-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

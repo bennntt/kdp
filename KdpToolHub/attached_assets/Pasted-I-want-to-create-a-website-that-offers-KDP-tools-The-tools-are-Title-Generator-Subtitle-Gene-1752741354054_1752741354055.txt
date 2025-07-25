@@ -1,0 +1,127 @@
+I want to create a website that offers KDP tools. The tools are:
+
+Title Generator
+
+Subtitle Generator
+
+Description Generator
+
+Author Generator
+
+Keyword Research
+
+Category Finder
+
+Royalty Calculator
+
+Trademark Search
+
+I want to add a contact support section.
+
+I want to provide subscription plans: monthly or yearly. There should be:
+
+A Free Plan: allows 3 attempts per day.
+
+A Paid Plan: $15/month or year, unlimited full access to all tools.
+
+Payment will be through Stripe.
+I want to include refund and subscription cancellation features.
+Free plan should not require a credit card.
+
+Each plan should clearly list its features.
+
+I want a dark theme, unified colors, and the site should be fully responsive and SEO-optimized.
+
+Account Features:
+Sign up / Sign in / Password reset.
+
+Email verification via link upon account creation.
+
+Google Sign-In option.
+
+During registration, I want to request:
+
+First name, last name
+
+Email
+
+Password + Confirm password
+
+Country, city, address
+
+Option to save or discard fetched location data.
+
+Users should be able to search with saved or entered data using the tools.
+
+Account Settings Page:
+Manage subscription
+
+Change password
+
+Change email
+
+Delete account
+
+Update name, country, city, address
+
+Interface:
+Tools should appear in a sidebar with expand/collapse option, and the sidebar state should persist between sessions.
+
+Admin Dashboard:
+View all users with:
+
+Plan type
+
+Account information
+
+Account creation date
+
+Ability to:
+
+Delete user
+
+Upgrade/downgrade user plan
+
+Disable specific tools for a user
+
+Send messages to users
+
+Ability to:
+
+Disable tools globally
+
+Control whether tools are free or paid
+
+Set daily limits for free plan
+
+Sort/filter users by:
+
+Plan
+
+Country
+
+Registration date
+
+Track tool usage:
+
+Number of tool uses per user
+
+Inputs used for each tool
+
+Tool output data
+
+Collect browser info and IP address for each request
+
+Full logs of all actions
+
+Track visits:
+
+Daily, weekly, monthly, yearly, or custom dates
+
+Tech stack:
+I want to use Flask for building this project.
+I also want you to handle team role planning.
+
+You are free to choose the best structure and order for everything I listed.
+I’m also open to any new suggestions you have.
+

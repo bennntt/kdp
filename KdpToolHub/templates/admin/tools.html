@@ -1,0 +1,897 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Tools Management - Admin Dashboard{% endblock %}
+{% block page_title %}Tools Control Center{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Tools Management</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Tools / Management</span>
+        </nav>
+    </div>
+    <div>
+        <button id="toggleMaintenanceBtn" class="btn btn-warning me-3" onclick="toggleMaintenanceMode()">
+            <i class="fas fa-wrench me-2"></i>
+            <span id="maintenanceText">Enable Maintenance</span>
+        </button>
+        <button class="btn btn-gradient" data-bs-toggle="modal" data-bs-target="#addPromptModal">
+            <i class="fas fa-plus me-2"></i>Add New Prompt
+        </button>
+    </div>
+</div>
+
+<!-- Tools Status Cards -->
+<div class="row mb-4">
+    {% for tool in tools_list %}
+    {% set tool_setting = tool_settings | selectattr('tool_name', 'eq', tool) | first %}
+    {% set is_enabled = tool_setting.is_enabled if tool_setting else true %}
+    
+    <div class="col-xl-3 col-lg-4 col-md-6 mb-3">
+        <div class="admin-card tool-card" data-tool="{{ tool }}">
+            <div class="card-body text-center">
+                <div class="tool-icon mb-3">
+                    {% if 'title' in tool %}
+                        <i class="fas fa-heading fa-2x text-primary"></i>
+                    {% elif 'subtitle' in tool %}
+                        <i class="fas fa-text-height fa-2x text-success"></i>
+                    {% elif 'description' in tool %}
+                        <i class="fas fa-align-left fa-2x text-info"></i>
+                    {% elif 'author' in tool %}
+                        <i class="fas fa-user-edit fa-2x text-warning"></i>
+                    {% elif 'keyword' in tool %}
+                        <i class="fas fa-search fa-2x text-danger"></i>
+                    {% elif 'category' in tool %}
+                        <i class="fas fa-tags fa-2x text-purple"></i>
+                    {% elif 'royalty' in tool %}
+                        <i class="fas fa-calculator fa-2x text-success"></i>
+                    {% elif 'trademark' in tool %}
+                        <i class="fas fa-shield-alt fa-2x text-orange"></i>
+                    {% else %}
+                        <i class="fas fa-tools fa-2x text-secondary"></i>
+                    {% endif %}
+                </div>
+                
+                <h6 class="card-title">{{ tool.replace('-', ' ').title() }}</h6>
+                
+                <div class="mb-3">
+                    <span class="badge bg-{{ 'success' if is_enabled else 'danger' }} status-badge">
+                        {{ 'Enabled' if is_enabled else 'Disabled' }}
+                    </span>
+                </div>
+                
+                <div class="tool-stats mb-3">
+                    <small class="text-muted">
+                        Usage: <span class="fw-bold">{{ tool_usage_stats.get(tool, 0) }}</span> times
+                    </small>
+                </div>
+                
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-sm btn-outline-{{ 'danger' if is_enabled else 'success' }}" 
+                            onclick="toggleTool('{{ tool }}', {{ is_enabled|lower }})">
+                        <i class="fas fa-power-off me-1"></i>
+                        {{ 'Disable' if is_enabled else 'Enable' }}
+                    </button>
+                    <button class="btn btn-sm btn-outline-info" 
+                            onclick="managePrompts('{{ tool }}')">
+                        <i class="fas fa-edit me-1"></i>
+                        Prompts
+                    </button>
+                    <button class="btn btn-sm btn-outline-warning" 
+                            onclick="toolSettings('{{ tool }}')">
+                        <i class="fas fa-cog me-1"></i>
+                        Settings
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- AI Prompts Management -->
+<div class="admin-card mb-4" id="prompts">
+    <div class="card-header bg-transparent border-bottom">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-brain me-2 text-info"></i>
+                AI Prompts Configuration
+            </h5>
+            <div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-language me-1"></i>Language: All
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="filterPrompts('all')">All Languages</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="filterPrompts('en')">English</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="filterPrompts('ar')">Arabic</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for tool_name, prompts in tool_prompts.items() %}
+            <div class="col-lg-6 mb-4">
+                <div class="prompt-section">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">
+                            <i class="fas fa-wrench me-2 text-primary"></i>
+                            {{ tool_name.replace('-', ' ').title() }}
+                        </h6>
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="addPrompt('{{ tool_name }}')">
+                            <i class="fas fa-plus me-1"></i>Add Prompt
+                        </button>
+                    </div>
+                    
+                    {% for prompt in prompts %}
+                    <div class="prompt-item mb-3 p-3 border rounded">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div class="prompt-info">
+                                <span class="badge bg-info me-2">{{ prompt.prompt_type.title() }}</span>
+                                <span class="badge bg-secondary">{{ prompt.language.upper() }}</span>
+                                {% if not prompt.is_active %}
+                                <span class="badge bg-danger">Inactive</span>
+                                {% endif %}
+                            </div>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="editPrompt({{ prompt.id }})">
+                                            <i class="fas fa-edit me-2"></i>Edit
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="duplicatePrompt({{ prompt.id }})">
+                                            <i class="fas fa-copy me-2"></i>Duplicate
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="togglePrompt({{ prompt.id }}, {{ prompt.is_active|lower }})">
+                                            <i class="fas fa-{{ 'eye-slash' if prompt.is_active else 'eye' }} me-2"></i>
+                                            {{ 'Deactivate' if prompt.is_active else 'Activate' }}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item text-danger" href="#" onclick="deletePrompt({{ prompt.id }})">
+                                            <i class="fas fa-trash me-2"></i>Delete
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="prompt-preview">
+                            <small class="text-muted">Prompt Text:</small>
+                            <div class="bg-dark p-2 rounded mt-1">
+                                <code class="text-light">{{ prompt.prompt_text[:100] }}{% if prompt.prompt_text|length > 100 %}...{% endif %}</code>
+                            </div>
+                        </div>
+                        
+                        <div class="prompt-meta mt-2">
+                            <small class="text-muted">
+                                Version {{ prompt.version }} • 
+                                Updated {{ prompt.updated_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% if prompt.updated_by %}
+                                by {{ prompt.updated_by }}
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-3 text-muted">
+                        <i class="fas fa-comment-dots fa-2x mb-2"></i>
+                        <div>No prompts configured</div>
+                        <small>Click "Add Prompt" to create the first prompt</small>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Generation Limits Configuration -->
+<div class="admin-card mb-4">
+    <div class="card-header bg-transparent border-bottom">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-tachometer-alt me-2 text-warning"></i>
+            Generation Limits & Controls
+        </h5>
+    </div>
+    <div class="card-body">
+        <form id="limitsForm" onsubmit="updateLimits(event)">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Title Generation Count</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="title_count" 
+                                   value="{{ settings.get('title_generation_count', 5) }}" min="1" max="20">
+                            <span class="input-group-text">titles per request</span>
+                        </div>
+                        <small class="text-muted">Number of titles generated per request</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Subtitle Generation Count</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="subtitle_count" 
+                                   value="{{ settings.get('subtitle_generation_count', 3) }}" min="1" max="10">
+                            <span class="input-group-text">subtitles per request</span>
+                        </div>
+                        <small class="text-muted">Number of subtitles generated per request</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Author Name Generation Count</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="author_count" 
+                                   value="{{ settings.get('author_generation_count', 10) }}" min="1" max="50">
+                            <span class="input-group-text">names per request</span>
+                        </div>
+                        <small class="text-muted">Number of author names generated per request</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Keyword Research Limit</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="keyword_count" 
+                                   value="{{ settings.get('keyword_research_count', 20) }}" min="5" max="100">
+                            <span class="input-group-text">keywords per request</span>
+                        </div>
+                        <small class="text-muted">Number of keywords returned per research</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Daily Usage Limit (Free Users)</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="daily_limit_free" 
+                                   value="{{ settings.get('daily_usage_limit_free', 3) }}" min="1" max="20">
+                            <span class="input-group-text">uses per day</span>
+                        </div>
+                        <small class="text-muted">Maximum daily uses for free accounts</small>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">API Timeout</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" name="api_timeout" 
+                                   value="{{ settings.get('api_timeout_seconds', 30) }}" min="10" max="120">
+                            <span class="input-group-text">seconds</span>
+                        </div>
+                        <small class="text-muted">API request timeout duration</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row mt-4">
+                <div class="col-12">
+                    <h6 class="mb-3">
+                        <i class="fas fa-toggle-on me-2 text-success"></i>
+                        Feature Toggles
+                    </h6>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="enable_ai_enhancement" 
+                                       {{ 'checked' if settings.get('enable_ai_enhancement', true) }} id="aiEnhancement">
+                                <label class="form-check-label" for="aiEnhancement">
+                                    AI Enhancement
+                                </label>
+                            </div>
+                            <small class="text-muted">Enable AI-powered content enhancement</small>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="enable_analytics" 
+                                       {{ 'checked' if settings.get('enable_analytics', true) }} id="analytics">
+                                <label class="form-check-label" for="analytics">
+                                    Usage Analytics
+                                </label>
+                            </div>
+                            <small class="text-muted">Track tool usage and performance</small>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="enable_rate_limiting" 
+                                       {{ 'checked' if settings.get('enable_rate_limiting', true) }} id="rateLimiting">
+                                <label class="form-check-label" for="rateLimiting">
+                                    Rate Limiting
+                                </label>
+                            </div>
+                            <small class="text-muted">Enforce usage rate limits</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-4">
+                <button type="submit" class="btn btn-gradient">
+                    <i class="fas fa-save me-2"></i>Save Configuration
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Tool Restrictions Management -->
+<div class="admin-card" id="restrictions">
+    <div class="card-header bg-transparent border-bottom">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-lock me-2 text-danger"></i>
+                Active Tool Restrictions
+            </h5>
+            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#addRestrictionModal">
+                <i class="fas fa-plus me-1"></i>Add Restriction
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table admin-table table-hover">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Restriction Type</th>
+                        <th>Value</th>
+                        <th>Reason</th>
+                        <th>Applied</th>
+                        <th>Expires</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Restrictions data will be loaded via JavaScript -->
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                            <div>Loading restrictions...</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Prompt Modal -->
+<div class="modal fade" id="promptModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Add/Edit Prompt</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="promptForm" onsubmit="savePrompt(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="promptId" name="prompt_id">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Tool Name</label>
+                                <select class="form-select" name="tool_name" id="toolName" required>
+                                    {% for tool in tools_list %}
+                                    <option value="{{ tool }}">{{ tool.replace('-', ' ').title() }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Prompt Type</label>
+                                <select class="form-select" name="prompt_type" required>
+                                    <option value="system">System</option>
+                                    <option value="user">User</option>
+                                    <option value="generation">Generation</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Language</label>
+                                <select class="form-select" name="language">
+                                    <option value="en">English</option>
+                                    <option value="ar">Arabic</option>
+                                    <option value="es">Spanish</option>
+                                    <option value="fr">French</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Prompt Text</label>
+                        <textarea class="form-control" name="prompt_text" rows="8" 
+                                  placeholder="Enter the AI prompt text here..." required></textarea>
+                        <small class="text-muted">
+                            Use variables like {book_title}, {keywords}, {language} for dynamic content
+                        </small>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_active" checked>
+                                <label class="form-check-label">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Version</label>
+                                <input type="number" class="form-control" name="version" value="1" min="1">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Prompt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Tool Management Functions
+function toggleTool(toolName, isEnabled) {
+    if (!confirm(`${isEnabled ? 'Disable' : 'Enable'} ${toolName.replace('-', ' ')}?`)) {
+        return;
+    }
+    
+    fetch(`/admin/tools/toggle/${toolName}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+function managePrompts(toolName) {
+    // Scroll to prompts section and highlight the tool
+    document.getElementById('prompts').scrollIntoView({ behavior: 'smooth' });
+    
+    // Highlight the specific tool prompts
+    setTimeout(() => {
+        const toolSection = document.querySelector(`[data-tool="${toolName}"]`);
+        if (toolSection) {
+            toolSection.style.background = 'rgba(102, 126, 234, 0.1)';
+            setTimeout(() => {
+                toolSection.style.background = '';
+            }, 2000);
+        }
+    }, 500);
+}
+
+function toolSettings(toolName) {
+    alert(`Settings for ${toolName.replace('-', ' ')} - Coming soon!`);
+}
+
+// Prompt Management Functions
+function addPrompt(toolName) {
+    document.getElementById('promptForm').reset();
+    document.getElementById('promptId').value = '';
+    document.getElementById('toolName').value = toolName || '';
+    document.querySelector('#promptModal .modal-title').textContent = 'Add New Prompt';
+    
+    new bootstrap.Modal(document.getElementById('promptModal')).show();
+}
+
+function editPrompt(promptId) {
+    // Fetch prompt data and populate form
+    fetch(`/admin/prompts/${promptId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const prompt = data.prompt;
+            document.getElementById('promptId').value = prompt.id;
+            document.getElementById('toolName').value = prompt.tool_name;
+            document.querySelector('[name="prompt_type"]').value = prompt.prompt_type;
+            document.querySelector('[name="language"]').value = prompt.language;
+            document.querySelector('[name="prompt_text"]').value = prompt.prompt_text;
+            document.querySelector('[name="is_active"]').checked = prompt.is_active;
+            document.querySelector('[name="version"]').value = prompt.version;
+            
+            document.querySelector('#promptModal .modal-title').textContent = 'Edit Prompt';
+            new bootstrap.Modal(document.getElementById('promptModal')).show();
+        }
+    });
+}
+
+function duplicatePrompt(promptId) {
+    editPrompt(promptId);
+    document.getElementById('promptId').value = '';
+    document.querySelector('#promptModal .modal-title').textContent = 'Duplicate Prompt';
+}
+
+function togglePrompt(promptId, isActive) {
+    fetch(`/admin/prompts/${promptId}/toggle`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function deletePrompt(promptId) {
+    if (!confirm('Delete this prompt? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch(`/admin/prompts/${promptId}`, {
+        method: 'DELETE'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+function savePrompt(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    const promptId = formData.get('prompt_id');
+    
+    const url = promptId ? `/admin/prompts/${promptId}` : '/admin/prompts';
+    const method = promptId ? 'PUT' : 'POST';
+    
+    fetch(url, {
+        method: method,
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('promptModal')).hide();
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+// Limits and Settings
+function updateLimits(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    
+    fetch('/admin/tools/limits', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Configuration updated successfully!');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    });
+}
+
+// Filter prompts by language
+function filterPrompts(language) {
+    const promptItems = document.querySelectorAll('.prompt-item');
+    
+    promptItems.forEach(item => {
+        const langBadge = item.querySelector('.badge.bg-secondary');
+        if (language === 'all' || (langBadge && langBadge.textContent.toLowerCase() === language.toUpperCase())) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    
+    // Update button text
+    const filterButton = document.querySelector('[data-bs-toggle="dropdown"]');
+    filterButton.innerHTML = `<i class="fas fa-language me-1"></i>Language: ${language === 'all' ? 'All' : language.toUpperCase()}`;
+}
+
+// Load restrictions data
+function loadRestrictions() {
+    fetch('/admin/tools/restrictions')
+    .then(response => response.json())
+    .then(data => {
+        const tbody = document.querySelector('#restrictions tbody');
+        
+        if (data.restrictions && data.restrictions.length > 0) {
+            tbody.innerHTML = data.restrictions.map(restriction => `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="user-avatar me-2">
+                                ${restriction.user.first_name[0] || 'U'}
+                            </div>
+                            <div>
+                                <div class="fw-semibold">${restriction.user.first_name} ${restriction.user.last_name}</div>
+                                <small class="text-muted">${restriction.user.email}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-warning">${restriction.restriction_type.replace('_', ' ')}</span>
+                    </td>
+                    <td>${restriction.restriction_value || 'N/A'}</td>
+                    <td>
+                        <small>${restriction.reason || 'No reason provided'}</small>
+                    </td>
+                    <td>
+                        <small>${new Date(restriction.applied_at).toLocaleDateString()}</small>
+                    </td>
+                    <td>
+                        <small>${restriction.expires_at ? new Date(restriction.expires_at).toLocaleDateString() : 'Never'}</small>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="removeRestriction(${restriction.id})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        } else {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" class="text-center py-4 text-muted">
+                        <i class="fas fa-unlock fa-2x mb-3"></i>
+                        <div>No active restrictions</div>
+                    </td>
+                </tr>
+            `;
+        }
+    });
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    loadRestrictions();
+    
+    // Real-time search for prompts
+    const searchInput = document.getElementById('promptSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const promptItems = document.querySelectorAll('.prompt-item');
+            
+            promptItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    }
+}
+
+// Maintenance Mode Functions
+async function toggleMaintenanceMode() {
+    const btn = document.getElementById('toggleMaintenanceBtn');
+    const text = document.getElementById('maintenanceText');
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+        
+        const response = await fetch('/admin/maintenance/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            const isEnabled = result.enabled;
+            
+            // Update button appearance
+            btn.className = isEnabled ? 'btn btn-danger me-3' : 'btn btn-warning me-3';
+            text.textContent = isEnabled ? 'Disable Maintenance' : 'Enable Maintenance';
+            
+            // Show success message
+            showAlert('success', result.message);
+            
+            // Update maintenance status indicator if exists
+            updateMaintenanceStatus(isEnabled);
+            
+        } else {
+            showAlert('danger', result.message);
+        }
+        
+    } catch (error) {
+        console.error('Error toggling maintenance mode:', error);
+        showAlert('danger', 'Failed to toggle maintenance mode');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wrench me-2"></i>' + text.textContent;
+    }
+}
+
+function updateMaintenanceStatus(isEnabled) {
+    // Add/remove maintenance indicator in UI
+    const existingIndicator = document.querySelector('.maintenance-indicator');
+    
+    if (isEnabled && !existingIndicator) {
+        const indicator = document.createElement('div');
+        indicator.className = 'alert alert-warning maintenance-indicator';
+        indicator.innerHTML = '<i class="fas fa-wrench me-2"></i>Maintenance Mode is Active';
+        document.querySelector('.page-header').after(indicator);
+    } else if (!isEnabled && existingIndicator) {
+        existingIndicator.remove();
+    }
+}
+
+// Tool Restriction Functions
+async function restrictUserTools(userId, toolNames, action = 'restrict') {
+    try {
+        const response = await fetch(`/admin/user/${userId}/tools/restrict`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                tools: toolNames,
+                action: action
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', result.message);
+            // Refresh tool status if on user details page
+            if (typeof refreshUserToolStatus === 'function') {
+                refreshUserToolStatus(userId);
+            }
+        } else {
+            showAlert('danger', result.message);
+        }
+        
+    } catch (error) {
+        console.error('Error restricting tools:', error);
+        showAlert('danger', 'Failed to update tool restrictions');
+    }
+}
+
+async function loadUserToolRestrictions(userId) {
+    try {
+        const response = await fetch(`/admin/user/${userId}/tools/status`);
+        const result = await response.json();
+        
+        if (result.success) {
+            return result.tools;
+        } else {
+            console.error('Failed to load restrictions:', result.message);
+            return {};
+        }
+        
+    } catch (error) {
+        console.error('Error loading tool restrictions:', error);
+        return {};
+    }
+}
+
+// System Status Functions
+async function loadSystemStatus() {
+    try {
+        const response = await fetch('/admin/system/status');
+        const result = await response.json();
+        
+        if (result.success) {
+            // Update maintenance mode button
+            const btn = document.getElementById('toggleMaintenanceBtn');
+            const text = document.getElementById('maintenanceText');
+            
+            if (btn && text) {
+                const isEnabled = result.maintenance_mode;
+                btn.className = isEnabled ? 'btn btn-danger me-3' : 'btn btn-warning me-3';
+                text.textContent = isEnabled ? 'Disable Maintenance' : 'Enable Maintenance';
+                
+                // Update maintenance status
+                updateMaintenanceStatus(isEnabled);
+            }
+            
+            // Update tool status indicators
+            Object.keys(result.tools).forEach(toolName => {
+                const toolCard = document.querySelector(`[data-tool="${toolName}"]`);
+                if (toolCard) {
+                    const badge = toolCard.querySelector('.status-badge');
+                    const isEnabled = result.tools[toolName].enabled;
+                    
+                    if (badge) {
+                        badge.className = isEnabled ? 'badge bg-success status-badge' : 'badge bg-danger status-badge';
+                        badge.textContent = isEnabled ? 'Enabled' : 'Disabled';
+                    }
+                }
+            });
+            
+        }
+        
+    } catch (error) {
+        console.error('Error loading system status:', error);
+    }
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Load system status on page load
+    loadSystemStatus();
+    
+    // Set up periodic status checks (every 30 seconds)
+    setInterval(loadSystemStatus, 30000);
+});
+
+// Utility function for showing alerts
+function showAlert(type, message) {
+    const alertContainer = document.querySelector('.alert-container') || createAlertContainer();
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    alertContainer.appendChild(alert);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.className = 'alert-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+    return container;
+}
+</script>
+{% endblock %}

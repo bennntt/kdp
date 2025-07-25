@@ -1,0 +1,60 @@
+<div class="tab-pane fade p-3" id="about" role="tabpanel" aria-labelledby="about-tab">
+                            <div class="row mb-4">
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-body">
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Version:</strong><br>
+                                                            <span class="text-muted">2.0.0</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Last Updated:</strong><br>
+                                                            <span class="text-muted">July 2025</span>
+                                                        </div>
+                                                        <div class="col-12 mb-3">
+                                                            <strong>Description:</strong><br>
+                                                            <span class="text-muted">KDP Tools is a comprehensive platform that provides essential tools for Amazon Kindle Direct Publishing authors. Our suite includes title generators, keyword research, royalty calculators, and more to help streamline your publishing workflow.</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Total Tools:</strong><br>
+                                                            <span class="text-muted">8 Professional Tools</span>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <strong>Support:</strong><br>
+                                                            <span class="text-muted">24/7 Customer Support</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-12">
+                                            <div class="card border-0 shadow-sm">
+                                                <div class="card-body">
+                                                    <h6 class="fw-bold mb-3">Available Tools</h6>
+                                                    <div class="row">
+                                                        <div class="col-md-6">
+                                                            <ul class="list-unstyled">
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Title Generator</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Subtitle Generator</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Description Generator</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Author Name Generator</li>
+                                                            </ul>
+                                                        </div>
+                                                        <div class="col-md-6">
+                                                            <ul class="list-unstyled">
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Keyword Research</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Category Finder</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Royalty Calculator</li>
+                                                                <li class="mb-2"><i class="fas fa-check text-success me-2"></i>Trademark Search</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>

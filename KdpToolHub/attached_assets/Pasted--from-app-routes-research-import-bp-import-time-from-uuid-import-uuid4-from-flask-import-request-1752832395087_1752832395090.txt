@@ -1,0 +1,107 @@
+
+from app.routes.research import bp
+import time
+from uuid import uuid4
+from flask import request, render_template, redirect, url_for, session
+from flask_login import login_required
+from bs4 import BeautifulSoup
+import requests
+
+# كاش مؤقت في الذاكرة
+SEARCH_CACHE = {}
+
+@bp.route('/trademark-search', methods=['GET', 'POST'])
+@login_required
+def trademark_search():
+    page = int(request.args.get('page', 1))
+    per_page = 15
+    keyword = request.args.get('keyword', '')
+    search_id = request.args.get('id', '')
+    results = []
+    total_found = 0
+
+    # حذف النتائج المنتهية الصلاحية
+    now = time.time()
+    expired_ids = [k for k, v in SEARCH_CACHE.items() if v['expires'] <= now]
+    for k in expired_ids:
+        del SEARCH_CACHE[k]
+
+    if request.method == 'POST':
+        keyword = request.form.get('keyword', '').strip()
+        if keyword:
+            try:
+                url = f"https://tmsearch.ai/search/?keyword={keyword}"
+                response = requests.get(url, timeout=10)
+                soup = BeautifulSoup(response.content, "html.parser")
+                items = soup.find_all("div", class_=lambda x: x and x.startswith("rb") and "data-group-1" in x)
+
+                for item in items:
+                    d = {}
+                    img_tag = item.select_one(".rb__img img")
+                    title_tag = item.select_one("h3.font_1")
+                    link_tag = item.select_one(".rb__img a")
+
+                    d['Image'] = True if img_tag else False
+                    d['Name_or_Image'] = img_tag['src'] if img_tag else (title_tag.get_text(strip=True) if title_tag else "N/A")
+                    d['Link'] = "https://tmsearch.ai" + link_tag['href'] if link_tag and link_tag.has_attr("href") else "N/A"
+
+                    grant_section = item.select_one(".rb-bottom__grant")
+                    d['Granted'] = grant_section.select_one("p.rb-bottom__date").get_text(strip=True) if grant_section and grant_section.select_one("p.rb-bottom__date") else "N/A"
+
+                    country_codes = item.select("div.country_code")
+                    d['Countries'] = [cc.get_text(strip=True) for cc in country_codes] if country_codes else []
+
+                    d['Status'] = item.select_one("div.result__expiration-status").get_text(strip=True) if item.select_one("div.result__expiration-status") else "N/A"
+                    d['Status_Date'] = item.select_one("span.rb__check-full__date").get_text(strip=True) if item.select_one("span.rb__check-full__date") else "N/A"
+
+                    results.append(d)
+
+                # تخزين النتيجة مع توقيت الانتهاء
+                search_id = str(uuid4())
+                SEARCH_CACHE[search_id] = {
+                    "keyword": keyword,
+                    "results": results,
+                    "expires": now + 3600  # صلاحية: 1 ساعة
+                }
+
+                return redirect(url_for("research.trademark_search", keyword=keyword, id=search_id, page=1))
+
+            except Exception as e:
+                print("❌ Error during scraping:", e)
+
+    elif search_id in SEARCH_CACHE:
+        data = SEARCH_CACHE[search_id]
+        keyword = data['keyword']
+        results = data['results']
+
+    total_found = len(results)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_results = results[start:end]
+    print(paginated_results)
+
+    return render_template('research/trademark_search.html',
+                           active_section='Trademark Search',
+                           keyword=keyword,
+                           results=paginated_results,
+                           total_found=total_found,
+                           page=page,
+                           per_page=per_page)
+
+
+
+
+@bp.route('/trademark-search/view')
+@login_required
+def trademark_view():
+    id = int(request.args.get('id', -1))
+    data = session.get('trademark_results', [])
+
+    if 0 <= id < len(data):
+        item = data[id]
+    else:
+        item = None
+
+    return render_template("research/trademark_view.html",
+                           active_section="Trademark Search",
+                           item=item)

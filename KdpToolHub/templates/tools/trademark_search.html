@@ -1,0 +1,714 @@
+{% extends "base.html" %}
+
+{% block title %}Trademark Search - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-shield-alt me-2 text-primary"></i>Trademark Search
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Search Section - Full Width Like Category Finder -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Trademark Search
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" id="trademark-search-form">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="search-container">
+                        <div class="input-group">
+                            {{ form.search_term(class="form-control form-control-lg", 
+                                placeholder="Enter trademark or book title...", 
+                                id="trademark-search-input") }}
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-search me-2"></i>Search Trademarks
+                            </button>
+                        </div>
+                        <div class="form-text mt-2">
+                            Search for trademarks by keyword (e.g., "book title", "brand name", "publishing")
+                        </div>
+                        {% if form.search_term.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.search_term.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Hidden field for search type - default to 'contains' -->
+                    <input type="hidden" name="search_type" value="contains">
+                    <!-- Hidden fields for pagination -->
+                    <input type="hidden" name="page" id="page-input" value="{{ page or 1 }}">
+                    <input type="hidden" name="keyword" value="{{ search_term }}">
+                    <input type="hidden" name="id" value="{{ search_id }}">
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if search_term %}
+<div class="trademark-results-anchor" id="trademark-results"></div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-clipboard-list me-2"></i>Trademark Search Results
+                    {% if results and results|length > 0 %}
+                        <span class="badge bg-success ms-2" id="results-count">{{ results|length }} trademarks found</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if results and results|length > 0 %}
+                    <!-- Statistics Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-primary text-white h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="fas fa-search mb-2" style="font-size: 2rem;"></i>
+                                    <h3 class="mb-1">{{ results|length }}</h3>
+                                    <small>Total Results</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-success text-white h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="fas fa-check-circle mb-2" style="font-size: 2rem;"></i>
+                                    <h3 class="mb-1">{{ results|selectattr('status', 'equalto', 'LIVE')|list|length }}</h3>
+                                    <small>Live Marks</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-danger text-white h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="fas fa-times-circle mb-2" style="font-size: 2rem;"></i>
+                                    <h3 class="mb-1">{{ results|selectattr('status', 'equalto', 'DEAD')|list|length }}</h3>
+                                    <small>Dead Marks</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-info text-white h-100">
+                                <div class="card-body text-center py-3">
+                                    <i class="fas fa-globe mb-2" style="font-size: 2rem;"></i>
+                                    <h3 class="mb-1">{{ results|map(attribute='country')|unique|list|length }}</h3>
+                                    <small>Countries</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+
+                    <!-- Enhanced Results Table with Dark Theme Like Image -->
+                    <div class="trademark-results-container" id="results-section">
+                        <div class="table-responsive trademark-table-scroll">
+                            <table class="table table-dark table-hover trademark-results-table">
+                                <thead>
+                                    <tr class="trademark-header">
+                                        <th class="trademark-col">TRADEMARK</th>
+                                        <th class="countries-col sortable" onclick="sortTable('countries')">
+                                            COUNTRIES
+                                            <i class="fas fa-sort sort-icon"></i>
+                                        </th>
+                                        <th class="granted-col sortable" onclick="sortTable('granted')">
+                                            GRANTED
+                                            <i class="fas fa-sort sort-icon"></i>
+                                        </th>
+                                        <th class="status-col sortable" onclick="sortTable('status')">
+                                            STATUS
+                                            <i class="fas fa-sort sort-icon"></i>
+                                        </th>
+                                        <th class="expires-col sortable" onclick="sortTable('expires')">
+                                            EXPIRES
+                                            <i class="fas fa-sort sort-icon"></i>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for result in paginated_results %}
+                                    <tr class="trademark-row" data-status="{{ result.status.lower() }}">
+                                        <td class="trademark-cell">
+                                            <div class="trademark-content d-flex justify-content-start align-items-center" style="min-height: 60px; padding-left: 10px;">
+                                                {% if result.image and result.name_or_image.startswith('http') %}
+                                                    <img src="{{ result.name_or_image }}" alt="Trademark Image" class="trademark-image-fixed" 
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                                    <div class="trademark-badge trademark-fallback" style="display: none;">{{ result.mark or 'N/A' }}</div>
+                                                {% else %}
+                                                    <div class="trademark-badge trademark-text">{{ result.name_or_image or result.mark or 'N/A' }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="countries-cell">
+                                            <div class="country-info">
+                                                {% if result.country and result.country != 'N/A' %}
+                                                    {% set flag_code = 'gb' if result.country.lower() == 'uk' else result.country.lower() %}
+                                                    <img src="https://flagcdn.com/h20/{{ flag_code }}.png" 
+                                                         alt="{{ result.country }}" class="country-flag-img"
+                                                         onerror="this.style.display='none'; this.nextElementSibling.style.display='inline';">
+                                                    <span class="country-flag-fallback" style="display: none;">🌍</span>
+                                                    <span class="country-code">{{ result.country }}</span>
+                                                {% else %}
+                                                    <span class="country-flag">🌍</span>
+                                                    <span class="country-code">N/A</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="granted-cell">
+                                            <span class="granted-date">{{ result.granted or 'N/A' }}</span>
+                                        </td>
+                                        <td class="status-cell">
+                                            {% if result.status == 'LIVE' %}
+                                                <span class="status-badge status-live">LIVE</span>
+                                            {% else %}
+                                                <span class="status-badge status-dead">DEAD</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="expires-cell">
+                                            <span class="expiry-date">{{ result.status_date or 'N/A' }}</span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Pagination with results info -->
+                        {% if total_pages > 1 %}
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <!-- Results Info on Left -->
+                            <div class="pagination-info">
+                                <span class="text-muted">
+                                    Showing {{ ((page-1) * per_page) + 1 }} - {{ [page * per_page, total_results]|min }} of {{ total_results }} results
+                                </span>
+                            </div>
+                            
+                            <!-- Pagination Controls on Right -->
+                            <nav aria-label="Trademark search pagination">
+                                <ul class="pagination pagination-sm mb-0">
+                                    <!-- Previous Button -->
+                                    {% if page > 1 %}
+                                        <li class="page-item">
+                                            <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage({{ page - 1 }})" aria-label="Previous">
+                                                <span aria-hidden="true">&laquo;</span>
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link bg-transparent border-secondary text-muted" aria-label="Previous">
+                                                <span aria-hidden="true">&laquo;</span>
+                                            </span>
+                                        </li>
+                                    {% endif %}
+                                    
+                                    <!-- Page Numbers -->
+                                    {% set start_page = [1, page - 2]|max %}
+                                    {% set end_page = [total_pages, page + 2]|min %}
+                                    
+                                    {% if start_page > 1 %}
+                                        <li class="page-item">
+                                            <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(1)">1</a>
+                                        </li>
+                                        {% if start_page > 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link bg-transparent border-secondary text-muted">...</span>
+                                            </li>
+                                        {% endif %}
+                                    {% endif %}
+                                    
+                                    {% for p in range(start_page, end_page + 1) %}
+                                        {% if p == page %}
+                                            <li class="page-item active">
+                                                <span class="page-link bg-secondary border-secondary text-white">{{ p }}</span>
+                                            </li>
+                                        {% else %}
+                                            <li class="page-item">
+                                                <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage({{ p }})">{{ p }}</a>
+                                            </li>
+                                        {% endif %}
+                                    {% endfor %}
+                                    
+                                    {% if end_page < total_pages %}
+                                        {% if end_page < total_pages - 1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link bg-transparent border-secondary text-muted">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <li class="page-item">
+                                            <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage({{ total_pages }})">{{ total_pages }}</a>
+                                        </li>
+                                    {% endif %}
+                                    
+                                    <!-- Next Button -->
+                                    {% if page < total_pages %}
+                                        <li class="page-item">
+                                            <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage({{ page + 1 }})" aria-label="Next">
+                                                <span aria-hidden="true">&raquo;</span>
+                                            </a>
+                                        </li>
+                                    {% else %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link bg-transparent border-secondary text-muted" aria-label="Next">
+                                                <span aria-hidden="true">&raquo;</span>
+                                            </span>
+                                        </li>
+                                    {% endif %}
+                                </ul>
+                            </nav>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                {% else %}
+                    <div class="text-center py-5" id="no-results">
+                        <i class="fas fa-shield-alt text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">No trademarks found</h5>
+                        <p class="text-muted">No matching trademarks found for your search term. Try a different keyword or spelling.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+
+<style>
+/* Dark Theme Table Styling - Remove Blue Background */
+.trademark-results-container {
+    border-radius: 8px;
+    overflow: hidden;
+    background: transparent;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+
+.trademark-results-table {
+    margin: 0;
+    background: transparent;
+}
+
+.trademark-results-table thead th {
+    background: rgba(0,0,0,0.3);
+    border: none;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+    padding: 15px 12px;
+    text-transform: uppercase;
+    width: 20%;
+    text-align: center;
+}
+
+.trademark-results-table thead th:first-child {
+    text-align: left;
+    padding-left: 20px;
+}
+
+.trademark-row {
+    transition: all 0.3s ease;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.trademark-row:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.trademark-row td {
+    padding: 15px 12px;
+    border: none;
+    vertical-align: middle;
+    text-align: center;
+    width: 20%;
+}
+
+.trademark-row td:first-child {
+    text-align: left;
+    padding-left: 20px;
+}
+
+/* Fixed size trademark badges and images */
+.trademark-badge {
+    background: rgba(255,255,255,0.9);
+    color: #1e3c72;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 40px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.trademark-image-fixed {
+    width: 60px;
+    height: 40px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.9);
+    padding: 4px;
+    object-fit: contain;
+    display: block;
+}
+
+.trademark-image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.trademark-image {
+    max-width: 60px;
+    max-height: 40px;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.9);
+    padding: 4px;
+    object-fit: contain;
+}
+
+.trademark-fallback {
+    min-width: 60px;
+    font-size: 0.85rem;
+    padding: 6px 10px;
+}
+
+/* Pagination Info Styling */
+.pagination-info {
+    font-size: 0.9rem;
+}
+
+/* Remove any blue backgrounds from pagination */
+.pagination .page-link {
+    background: transparent !important;
+}
+
+.pagination .page-link:hover {
+    background: rgba(255,255,255,0.1) !important;
+}
+
+.pagination .page-item.active .page-link {
+    background: rgba(108, 117, 125, 0.8) !important;
+}
+
+/* Ensure no background interference */
+.d-flex.justify-content-between {
+    background: transparent !important;
+    padding: 0 !important;
+}
+
+/* Remove any remaining blue backgrounds */
+.trademark-results-table,
+.trademark-results-container,
+.table-responsive {
+    background: transparent !important;
+}
+
+/* Ensure the entire table area has no blue background */
+.card-body {
+    background: transparent !important;
+}
+
+/* Sortable column styles */
+.sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+
+.sortable:hover {
+    background-color: rgba(255,255,255,0.1) !important;
+}
+
+.sort-icon {
+    margin-left: 5px;
+    font-size: 0.8rem;
+    opacity: 0.6;
+}
+
+.sortable:hover .sort-icon {
+    opacity: 1;
+}
+
+/* Active sort column styling */
+.sortable.sort-active {
+    background-color: rgba(255,255,255,0.1) !important;
+}
+
+.sortable.sort-active .sort-icon {
+    opacity: 1;
+    color: #007bff;
+}
+
+/* Smooth table scrolling */
+.trademark-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.trademark-table-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.trademark-table-scroll::-webkit-scrollbar-track {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+}
+
+.trademark-table-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+}
+
+.trademark-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+/* Smooth hover transitions for rows */
+.trademark-row {
+    transition: all 0.3s ease;
+}
+
+.trademark-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Anchor positioning fix */
+.trademark-results-anchor {
+    position: relative;
+    top: -10px; /* Minimal offset for better positioning */
+    visibility: hidden;
+}
+
+.country-flag-img {
+    width: 20px;
+    height: auto;
+    margin-right: 8px;
+    border-radius: 2px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.country-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.country-flag {
+    font-size: 1.2rem;
+}
+
+.country-code {
+    background: rgba(255,255,255,0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.granted-date, .expiry-date {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.8);
+}
+
+.status-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-live {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    box-shadow: 0 2px 4px rgba(40,167,69,0.3);
+}
+
+.status-dead {
+    background: linear-gradient(135deg, #dc3545, #c82333);
+    color: white;
+    box-shadow: 0 2px 4px rgba(220,53,69,0.3);
+}
+
+/* Search Form Styling */
+.search-container .input-group {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.search-container .form-control {
+    border: none;
+    font-size: 1.1rem;
+    padding: 12px 16px;
+}
+
+.search-container .btn {
+    border: none;
+    padding: 12px 24px;
+    font-weight: 600;
+}
+
+/* Summary Cards */
+.search-summary .alert {
+    background: linear-gradient(135deg, rgba(0,123,255,0.1) 0%, rgba(0,123,255,0.05) 100%);
+    border: 1px solid rgba(0,123,255,0.2);
+    border-radius: 8px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .trademark-results-table {
+        font-size: 0.8rem;
+    }
+    
+    .trademark-badge {
+        padding: 6px 8px;
+        font-size: 0.8rem;
+        min-width: 50px;
+    }
+    
+    .status-badge {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+}
+</style>
+
+<script>
+// Trademark search functionality with scroll to results
+document.addEventListener('DOMContentLoaded', function() {
+    // Search on Enter key
+    const searchInput = document.getElementById('trademark-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('trademark-search-form').submit();
+            }
+        });
+    }
+    
+    // Scroll to results if they exist
+    {% if results %}
+        setTimeout(function() {
+            const resultsElement = document.getElementById('trademark-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+
+// Image loading error handling
+function handleImageError(img) {
+    img.style.display = 'none';
+    const fallback = img.nextElementSibling;
+    if (fallback) {
+        fallback.style.display = 'block';
+    }
+}
+
+// Pagination functionality
+function goToPage(pageNumber) {
+    const searchTerm = '{{ search_term }}';
+    const searchId = '{{ search_id }}';
+    const sortBy = '{{ sort_by }}';
+    const sortOrder = '{{ sort_order }}';
+    
+    if (searchTerm) {
+        let url = `{{ url_for('tools.trademark_search') }}?keyword=${encodeURIComponent(searchTerm)}&id=${searchId}&page=${pageNumber}`;
+        if (sortBy && sortBy !== 'default') {
+            url += `&sort=${sortBy}&order=${sortOrder}`;
+        }
+        window.location.href = url;
+    }
+}
+
+// Sorting functionality
+function sortTable(column) {
+    const searchTerm = '{{ search_term }}';
+    const searchId = '{{ search_id }}';
+    const currentSort = '{{ sort_by }}';
+    const currentOrder = '{{ sort_order }}';
+    
+    // Determine new sort order
+    let newOrder = 'asc';
+    if (currentSort === column && currentOrder === 'asc') {
+        newOrder = 'desc';
+    }
+    
+    if (searchTerm) {
+        const url = `{{ url_for('tools.trademark_search') }}?keyword=${encodeURIComponent(searchTerm)}&id=${searchId}&page=1&sort=${column}&order=${newOrder}`;
+        window.location.href = url;
+    }
+}
+
+// Update sort icons on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const currentSort = '{{ sort_by }}';
+    const currentOrder = '{{ sort_order }}';
+    
+    if (currentSort && currentSort !== 'default') {
+        // Find the corresponding column header
+        const headers = document.querySelectorAll('.sortable');
+        headers.forEach(header => {
+            const column = header.getAttribute('onclick').match(/'([^']+)'/)[1];
+            const icon = header.querySelector('.sort-icon');
+            
+            if (column === currentSort) {
+                header.classList.add('sort-active');
+                if (currentOrder === 'asc') {
+                    icon.className = 'fas fa-sort-up sort-icon';
+                } else {
+                    icon.className = 'fas fa-sort-down sort-icon';
+                }
+            }
+        });
+    }
+});
+
+// Real-time search suggestion (placeholder for future enhancement)
+function updateResultsCount(count) {
+    const counter = document.getElementById('results-count');
+    if (counter) {
+        counter.textContent = `${count} trademarks found`;
+    }
+}
+</script>
+{% endblock %}

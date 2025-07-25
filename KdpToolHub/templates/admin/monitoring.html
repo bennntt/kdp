@@ -1,0 +1,230 @@
+{% extends "admin/base.html" %}
+
+{% block title %}System Monitoring - Admin Panel{% endblock %}
+
+{% block admin_content %}
+<div class="monitoring">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">System Monitoring</h1>
+            <p class="text-muted">Real-time system performance and health monitoring</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-success">
+                <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+            <button class="btn btn-primary">
+                <i class="fas fa-cog me-2"></i>Configure
+            </button>
+        </div>
+    </div>
+
+    <!-- System Health Status -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-success text-white rounded me-3">
+                            <i class="fas fa-heartbeat"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">System Health</h6>
+                            <h4 class="mb-0 text-success">Healthy</h4>
+                            <small class="text-muted">All systems operational</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-info text-white rounded me-3">
+                            <i class="fas fa-microchip"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">CPU Usage</h6>
+                            <h4 class="mb-0">23%</h4>
+                            <small class="text-muted">4 cores available</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-warning text-white rounded me-3">
+                            <i class="fas fa-memory"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Memory Usage</h6>
+                            <h4 class="mb-0">67%</h4>
+                            <small class="text-muted">2.1GB / 3.2GB</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-primary text-white rounded me-3">
+                            <i class="fas fa-hdd"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Disk Usage</h6>
+                            <h4 class="mb-0">45%</h4>
+                            <small class="text-muted">4.5GB / 10GB</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Performance Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
+                        <p class="text-muted mb-0">Real-time performance chart</p>
+                        <small class="text-muted">Integration with monitoring tools needed</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Active Connections</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-success text-white rounded-circle me-3" style="width: 32px; height: 32px;">
+                            <i class="fas fa-users" style="font-size: 12px;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">Active Users</h6>
+                            <small class="text-muted">Currently online</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0">{{ active_users or 0 }}</h5>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="icon-shape bg-info text-white rounded-circle me-3" style="width: 32px; height: 32px;">
+                            <i class="fas fa-database" style="font-size: 12px;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">DB Connections</h6>
+                            <small class="text-muted">Open connections</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0">12</h5>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-warning text-white rounded-circle me-3" style="width: 32px; height: 32px;">
+                            <i class="fas fa-globe" style="font-size: 12px;"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">API Requests</h6>
+                            <small class="text-muted">Per minute</small>
+                        </div>
+                        <div class="text-end">
+                            <h5 class="mb-0">847</h5>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Service Status -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom">
+            <h5 class="card-title mb-0">Service Status</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                        <div class="icon-shape bg-success text-white rounded me-3" style="width: 40px; height: 40px;">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">Web Server</h6>
+                            <small class="text-success">Running - Gunicorn</small>
+                        </div>
+                        <span class="badge bg-success">Online</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                        <div class="icon-shape bg-success text-white rounded me-3" style="width: 40px; height: 40px;">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">Database</h6>
+                            <small class="text-success">Running - PostgreSQL</small>
+                        </div>
+                        <span class="badge bg-success">Online</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                        <div class="icon-shape bg-success text-white rounded me-3" style="width: 40px; height: 40px;">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">Email Service</h6>
+                            <small class="text-success">Running - SMTP</small>
+                        </div>
+                        <span class="badge bg-success">Online</span>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 mb-3">
+                    <div class="d-flex align-items-center p-3 bg-light rounded">
+                        <div class="icon-shape bg-success text-white rounded me-3" style="width: 40px; height: 40px;">
+                            <i class="fas fa-credit-card"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0">Payment Service</h6>
+                            <small class="text-success">Running - Stripe</small>
+                        </div>
+                        <span class="badge bg-success">Online</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.monitoring .icon-shape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

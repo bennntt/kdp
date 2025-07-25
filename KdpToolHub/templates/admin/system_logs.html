@@ -1,0 +1,214 @@
+{% extends "admin/base.html" %}
+
+{% block title %}System Logs - Admin Panel{% endblock %}
+
+{% block admin_content %}
+<div class="system-logs">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">System Logs</h1>
+            <p class="text-muted">Monitor system activities and error logs</p>
+        </div>
+        <div class="d-flex gap-2">
+            <select class="form-select" style="width: auto;" onchange="window.location.href = '{{ url_for('admin.system_logs') }}?type=' + this.value">
+                <option value="all" {% if log_type == 'all' %}selected{% endif %}>All Logs</option>
+                <option value="error" {% if log_type == 'error' %}selected{% endif %}>Errors</option>
+                <option value="warning" {% if log_type == 'warning' %}selected{% endif %}>Warnings</option>
+                <option value="info" {% if log_type == 'info' %}selected{% endif %}>Info</option>
+            </select>
+            <button class="btn btn-outline-danger">
+                <i class="fas fa-trash me-2"></i>Clear Logs
+            </button>
+        </div>
+    </div>
+
+    <!-- System Stats -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-success text-white rounded me-3">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">System Status</h6>
+                            <small class="text-muted">Running</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-danger text-white rounded me-3">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Errors (24h)</h6>
+                            <small class="text-muted">{{ logs.total if logs else 0 }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-warning text-white rounded me-3">
+                            <i class="fas fa-exclamation-circle"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Warnings</h6>
+                            <small class="text-muted">0</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-info text-white rounded me-3">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Uptime</h6>
+                            <small class="text-muted">99.9%</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Table -->
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-transparent border-bottom">
+            <h5 class="card-title mb-0">Recent System Logs</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Level</th>
+                            <th>Message</th>
+                            <th>Source</th>
+                            <th>Timestamp</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if logs and logs.items %}
+                            {% for log in logs.items %}
+                            <tr>
+                                <td>
+                                    {% if log.action and 'error' in log.action.lower() %}
+                                        <span class="badge bg-danger">ERROR</span>
+                                    {% elif log.action and 'warning' in log.action.lower() %}
+                                        <span class="badge bg-warning">WARNING</span>
+                                    {% else %}
+                                        <span class="badge bg-info">INFO</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="fw-semibold">{{ log.action if log.action else 'System Activity' }}</div>
+                                    <small class="text-muted">{{ log.details | truncate(100) if log.details else 'No details available' }}</small>
+                                </td>
+                                <td>
+                                    {% if log.user %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="user-avatar me-2" style="width: 24px; height: 24px; font-size: 10px;">
+                                                {{ log.user.first_name[0] if log.user.first_name else 'U' }}
+                                            </div>
+                                            <small>{{ log.user.first_name }} {{ log.user.last_name }}</small>
+                                        </div>
+                                    {% else %}
+                                        <small class="text-muted">System</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') if log.timestamp else 'Unknown' }}</div>
+                                    {% if log.ip_address %}
+                                    <small class="text-muted">{{ log.ip_address }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="fas fa-list-alt fa-3x mb-3"></i>
+                                    <p class="mb-0">No logs found</p>
+                                    <small>System logs will appear here when available</small>
+                                </td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if logs and logs.pages > 1 %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if logs.has_prev %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.system_logs', page=logs.prev_num, type=log_type) }}">Previous</a>
+                </li>
+            {% endif %}
+            
+            {% for page_num in logs.iter_pages() %}
+                {% if page_num %}
+                    {% if page_num != logs.page %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.system_logs', page=page_num, type=log_type) }}">{{ page_num }}</a>
+                        </li>
+                    {% else %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ page_num }}</span>
+                        </li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if logs.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="{{ url_for('admin.system_logs', page=logs.next_num, type=log_type) }}">Next</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<style>
+.system-logs .icon-shape {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

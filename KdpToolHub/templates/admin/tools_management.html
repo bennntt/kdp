@@ -1,0 +1,898 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Tools Management - Admin Panel{% endblock %}
+
+{% block extra_css %}
+<style>
+.tools-management-container {
+    padding: 2rem 0;
+}
+
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem;
+    border-radius: 15px;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+}
+
+.admin-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    border: none;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.15);
+}
+
+.card-header {
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-bottom: 2px solid #dee2e6;
+    padding: 1.5rem;
+}
+
+.tool-item {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+    cursor: move;
+}
+
+.tool-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+}
+
+.tool-item.disabled {
+    background: #f8f9fa;
+    opacity: 0.7;
+}
+
+.tool-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.tool-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    margin-right: 1rem;
+}
+
+.tool-info h5 {
+    margin: 0;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.tool-info p {
+    margin: 0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.tool-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.form-switch {
+    margin: 0;
+}
+
+.form-switch .form-check-input {
+    width: 3rem;
+    height: 1.5rem;
+}
+
+.form-switch .form-check-input:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.tool-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e9ecef;
+}
+
+.stat-item {
+    text-align: center;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #667eea;
+    display: block;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    color: #718096;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.access-control {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.access-control h6 {
+    margin: 0 0 0.5rem 0;
+    color: #2d3748;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.access-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.access-btn {
+    padding: 0.25rem 0.75rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.access-btn.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+
+.access-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.access-btn.active:hover {
+    background: #5a6fd8;
+}
+
+.drag-handle {
+    cursor: move;
+    color: #adb5bd;
+    font-size: 1.2rem;
+    margin-right: 0.5rem;
+}
+
+.drag-handle:hover {
+    color: #667eea;
+}
+
+.sortable-ghost {
+    opacity: 0.5;
+}
+
+.sortable-chosen {
+    transform: scale(1.02);
+}
+
+.tools-sidebar {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    padding: 1.5rem;
+    height: fit-content;
+    position: sticky;
+    top: 2rem;
+}
+
+.sidebar-header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.sidebar-stats {
+    margin-bottom: 2rem;
+}
+
+.sidebar-stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f3f4;
+}
+
+.sidebar-stat:last-child {
+    border-bottom: none;
+}
+
+.sidebar-stat-label {
+    font-size: 0.9rem;
+    color: #718096;
+}
+
+.sidebar-stat-value {
+    font-weight: bold;
+    color: #2d3748;
+}
+
+.bulk-actions {
+    margin-bottom: 2rem;
+}
+
+.bulk-actions h6 {
+    margin-bottom: 1rem;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.bulk-btn {
+    width: 100%;
+    margin-bottom: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #dee2e6;
+    background: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: left;
+}
+
+.bulk-btn:hover {
+    background: #f8f9fa;
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.bulk-btn i {
+    margin-right: 0.5rem;
+    width: 16px;
+}
+
+.usage-chart {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.chart-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.chart-label {
+    width: 100px;
+    font-size: 0.8rem;
+    color: #718096;
+}
+
+.chart-progress {
+    flex: 1;
+    height: 8px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin: 0 0.5rem;
+    overflow: hidden;
+}
+
+.chart-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.chart-value {
+    font-size: 0.8rem;
+    font-weight: bold;
+    color: #2d3748;
+    min-width: 40px;
+    text-align: right;
+}
+
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+@media (max-width: 768px) {
+    .tools-sidebar {
+        position: static;
+        margin-bottom: 2rem;
+    }
+    
+    .tool-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .tool-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    .access-buttons {
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid tools-management-container">
+    <!-- Page Header -->
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-2">
+                    <i class="fas fa-tools me-3"></i>Tools Management
+                </h1>
+                <p class="mb-0 opacity-90">
+                    Manage tools availability, access control, and usage statistics
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-light" onclick="saveToolsOrder()">
+                    <i class="fas fa-save me-2"></i>Save Order
+                </button>
+                <button class="btn btn-light" onclick="resetToDefaults()">
+                    <i class="fas fa-undo me-2"></i>Reset to Defaults
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-lg-3">
+            <div class="tools-sidebar">
+                <div class="sidebar-header">
+                    <h5 class="mb-1">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>
+                        Tools Overview
+                    </h5>
+                    <small class="text-muted">Real-time statistics</small>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="sidebar-stats">
+                    <div class="sidebar-stat">
+                        <span class="sidebar-stat-label">Total Tools</span>
+                        <span class="sidebar-stat-value" id="total-tools">{{ tools|length }}</span>
+                    </div>
+                    <div class="sidebar-stat">
+                        <span class="sidebar-stat-label">Active Tools</span>
+                        <span class="sidebar-stat-value text-success" id="active-tools">
+                            {{ tools|selectattr('is_enabled')|list|length }}
+                        </span>
+                    </div>
+                    <div class="sidebar-stat">
+                        <span class="sidebar-stat-label">Disabled Tools</span>
+                        <span class="sidebar-stat-value text-danger" id="disabled-tools">
+                            {{ tools|rejectattr('is_enabled')|list|length }}
+                        </span>
+                    </div>
+                    <div class="sidebar-stat">
+                        <span class="sidebar-stat-label">Premium Only</span>
+                        <span class="sidebar-stat-value text-warning" id="premium-tools">
+                            {{ tools|selectattr('requires_paid_plan')|list|length }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Bulk Actions -->
+                <div class="bulk-actions">
+                    <h6>
+                        <i class="fas fa-layer-group me-2"></i>Bulk Actions
+                    </h6>
+                    <button class="bulk-btn" onclick="bulkAction('enable')">
+                        <i class="fas fa-play text-success"></i>Enable All Tools
+                    </button>
+                    <button class="bulk-btn" onclick="bulkAction('disable')">
+                        <i class="fas fa-pause text-danger"></i>Disable All Tools
+                    </button>
+                    <button class="bulk-btn" onclick="bulkAction('free')">
+                        <i class="fas fa-unlock text-info"></i>Make All Free
+                    </button>
+                    <button class="bulk-btn" onclick="bulkAction('premium')">
+                        <i class="fas fa-crown text-warning"></i>Make All Premium
+                    </button>
+                </div>
+
+                <!-- Usage Chart -->
+                <div class="usage-chart">
+                    <h6 class="mb-3">
+                        <i class="fas fa-chart-line me-2"></i>Usage Statistics
+                    </h6>
+                    {% for tool in tools[:5] %}
+                    <div class="chart-bar">
+                        <div class="chart-label">{{ tool.display_name[:8] }}</div>
+                        <div class="chart-progress">
+                            <div class="chart-fill" style="width: {{ (tool.usage_count / max_usage * 100) if max_usage > 0 else 0 }}%"></div>
+                        </div>
+                        <div class="chart-value">{{ tool.usage_count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-lg-9">
+            <div class="admin-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-cogs me-2"></i>Tools Configuration
+                        </h5>
+                        <div class="d-flex gap-2">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="auto-save" checked>
+                                <label class="form-check-label" for="auto-save">Auto Save</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Tools List -->
+                    <div id="tools-list" class="sortable-list">
+                        {% for tool in tools %}
+                        <div class="tool-item {{ 'disabled' if not tool.is_enabled }}" data-tool-id="{{ tool.id }}" data-tool-name="{{ tool.tool_name }}">
+                            <div class="tool-header">
+                                <div class="d-flex align-items-center flex-grow-1">
+                                    <div class="drag-handle">
+                                        <i class="fas fa-grip-vertical"></i>
+                                    </div>
+                                    <div class="tool-icon">
+                                        <i class="{{ tool.icon or 'fas fa-tool' }}"></i>
+                                    </div>
+                                    <div class="tool-info">
+                                        <h5>{{ tool.display_name }}</h5>
+                                        <p>{{ tool.description or 'No description available' }}</p>
+                                    </div>
+                                </div>
+                                <div class="tool-controls">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input tool-toggle" type="checkbox" 
+                                               id="tool-{{ tool.id }}" 
+                                               data-tool-id="{{ tool.id }}"
+                                               {{ 'checked' if tool.is_enabled else '' }}>
+                                        <label class="form-check-label" for="tool-{{ tool.id }}">
+                                            {{ 'Enabled' if tool.is_enabled else 'Disabled' }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tool Statistics -->
+                            <div class="tool-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ tool.usage_count or 0 }}</span>
+                                    <span class="stat-label">Total Uses</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ tool.daily_usage or 0 }}</span>
+                                    <span class="stat-label">Today</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ tool.weekly_usage or 0 }}</span>
+                                    <span class="stat-label">This Week</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ tool.free_usage or 0 }}</span>
+                                    <span class="stat-label">Free Users</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value">{{ tool.premium_usage or 0 }}</span>
+                                    <span class="stat-label">Premium Users</span>
+                                </div>
+                            </div>
+
+                            <!-- Access Control -->
+                            <div class="access-control">
+                                <h6>
+                                    <i class="fas fa-shield-alt me-2"></i>Access Control
+                                </h6>
+                                <div class="access-buttons">
+                                    <button class="access-btn {{ 'active' if not tool.requires_paid_plan else '' }}" 
+                                            data-access="free" data-tool-id="{{ tool.id }}">
+                                        <i class="fas fa-unlock me-1"></i>Free Users
+                                    </button>
+                                    <button class="access-btn {{ 'active' if tool.requires_paid_plan else '' }}" 
+                                            data-access="premium" data-tool-id="{{ tool.id }}">
+                                        <i class="fas fa-crown me-1"></i>Premium Only
+                                    </button>
+                                    <button class="access-btn" data-access="disabled" data-tool-id="{{ tool.id }}">
+                                        <i class="fas fa-ban me-1"></i>Disabled for All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Container -->
+<div class="toast-container"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script>
+// Tools Management JavaScript
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Tools Management loaded');
+    
+    // Initialize sortable
+    initializeSortable();
+    
+    // Initialize event listeners
+    initializeEventListeners();
+    
+    // Load initial data
+    loadToolsData();
+});
+
+// Initialize sortable functionality
+function initializeSortable() {
+    const toolsList = document.getElementById('tools-list');
+    if (toolsList) {
+        new Sortable(toolsList, {
+            handle: '.drag-handle',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            chosenClass: 'sortable-chosen',
+            onEnd: function(evt) {
+                console.log('Tool moved from', evt.oldIndex, 'to', evt.newIndex);
+                if (document.getElementById('auto-save').checked) {
+                    saveToolsOrder();
+                }
+                updateSidebarStats();
+            }
+        });
+    }
+}
+
+// Initialize event listeners
+function initializeEventListeners() {
+    // Tool toggle switches
+    document.querySelectorAll('.tool-toggle').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const toolId = this.dataset.toolId;
+            const isEnabled = this.checked;
+            updateToolStatus(toolId, isEnabled);
+        });
+    });
+    
+    // Access control buttons
+    document.querySelectorAll('.access-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const toolId = this.dataset.toolId;
+            const access = this.dataset.access;
+            updateToolAccess(toolId, access, this);
+        });
+    });
+}
+
+// Update tool status (enabled/disabled)
+function updateToolStatus(toolId, isEnabled) {
+    console.log(`Updating tool ${toolId} status to ${isEnabled}`);
+    
+    const toolItem = document.querySelector(`[data-tool-id="${toolId}"]`);
+    const label = toolItem.querySelector('.form-check-label');
+    
+    // Update UI immediately
+    if (isEnabled) {
+        toolItem.classList.remove('disabled');
+        label.textContent = 'Enabled';
+    } else {
+        toolItem.classList.add('disabled');
+        label.textContent = 'Disabled';
+    }
+    
+    // Send to server
+    fetch('/admin/tools/update-status', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tool_id: toolId,
+            is_enabled: isEnabled
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Tool ${isEnabled ? 'enabled' : 'disabled'} successfully`, 'success');
+            updateSidebarStats();
+        } else {
+            showToast(data.message || 'Failed to update tool status', 'error');
+            // Revert UI change
+            const toggle = document.querySelector(`#tool-${toolId}`);
+            toggle.checked = !isEnabled;
+            updateToolStatus(toolId, !isEnabled);
+        }
+    })
+    .catch(error => {
+        console.error('Error updating tool status:', error);
+        showToast('Error updating tool status', 'error');
+    });
+}
+
+// Update tool access control
+function updateToolAccess(toolId, access, button) {
+    console.log(`Updating tool ${toolId} access to ${access}`);
+    
+    // Update UI immediately
+    const toolItem = button.closest('.tool-item');
+    const accessButtons = toolItem.querySelectorAll('.access-btn');
+    
+    accessButtons.forEach(btn => btn.classList.remove('active'));
+    button.classList.add('active');
+    
+    // Determine requires_paid_plan value
+    let requiresPaidPlan = false;
+    let isEnabled = true;
+    
+    switch(access) {
+        case 'free':
+            requiresPaidPlan = false;
+            isEnabled = true;
+            break;
+        case 'premium':
+            requiresPaidPlan = true;
+            isEnabled = true;
+            break;
+        case 'disabled':
+            isEnabled = false;
+            break;
+    }
+    
+    // Send to server
+    fetch('/admin/tools/update-access', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            tool_id: toolId,
+            requires_paid_plan: requiresPaidPlan,
+            is_enabled: isEnabled
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Tool access updated to ${access}`, 'success');
+            
+            // Update tool toggle if disabled
+            if (!isEnabled) {
+                const toggle = document.querySelector(`#tool-${toolId}`);
+                toggle.checked = false;
+                updateToolStatus(toolId, false);
+            }
+            
+            updateSidebarStats();
+        } else {
+            showToast(data.message || 'Failed to update tool access', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating tool access:', error);
+        showToast('Error updating tool access', 'error');
+    });
+}
+
+// Save tools order
+function saveToolsOrder() {
+    const toolsList = document.getElementById('tools-list');
+    const toolItems = toolsList.querySelectorAll('.tool-item');
+    const order = [];
+    
+    toolItems.forEach((item, index) => {
+        order.push({
+            tool_id: item.dataset.toolId,
+            sort_order: index + 1
+        });
+    });
+    
+    console.log('Saving tools order:', order);
+    
+    fetch('/admin/tools/update-order', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ order: order })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Tools order saved successfully', 'success');
+        } else {
+            showToast(data.message || 'Failed to save tools order', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error saving tools order:', error);
+        showToast('Error saving tools order', 'error');
+    });
+}
+
+// Bulk actions
+function bulkAction(action) {
+    console.log(`Performing bulk action: ${action}`);
+    
+    if (!confirm(`Are you sure you want to ${action} all tools?`)) {
+        return;
+    }
+    
+    fetch('/admin/tools/bulk-action', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: action })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(`Bulk action "${action}" completed successfully`, 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast(data.message || 'Bulk action failed', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error performing bulk action:', error);
+        showToast('Error performing bulk action', 'error');
+    });
+}
+
+// Reset to defaults
+function resetToDefaults() {
+    if (!confirm('Are you sure you want to reset all tools to default settings? This action cannot be undone.')) {
+        return;
+    }
+    
+    fetch('/admin/tools/reset-defaults', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Tools reset to defaults successfully', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            showToast(data.message || 'Failed to reset tools', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error resetting tools:', error);
+        showToast('Error resetting tools', 'error');
+    });
+}
+
+// Load tools data
+function loadToolsData() {
+    fetch('/admin/tools/data')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateSidebarStats(data.stats);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading tools data:', error);
+    });
+}
+
+// Update sidebar statistics
+function updateSidebarStats(stats = null) {
+    if (!stats) {
+        // Calculate from DOM
+        const totalTools = document.querySelectorAll('.tool-item').length;
+        const activeTools = document.querySelectorAll('.tool-item:not(.disabled)').length;
+        const disabledTools = totalTools - activeTools;
+        const premiumTools = document.querySelectorAll('.access-btn[data-access="premium"].active').length;
+        
+        document.getElementById('total-tools').textContent = totalTools;
+        document.getElementById('active-tools').textContent = activeTools;
+        document.getElementById('disabled-tools').textContent = disabledTools;
+        document.getElementById('premium-tools').textContent = premiumTools;
+    } else {
+        document.getElementById('total-tools').textContent = stats.total_tools;
+        document.getElementById('active-tools').textContent = stats.active_tools;
+        document.getElementById('disabled-tools').textContent = stats.disabled_tools;
+        document.getElementById('premium-tools').textContent = stats.premium_tools;
+    }
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    const toastId = 'toast-' + Date.now();
+    const bgClass = type === 'success' ? 'bg-success' : type === 'error' ? 'bg-danger' : 'bg-info';
+    const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-triangle' : 'fa-info-circle';
+    
+    const toastHtml = `
+        <div id="${toastId}" class="toast align-items-center text-white ${bgClass} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">
+                    <i class="fas ${iconClass} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    const toastElement = document.getElementById(toastId);
+    if (window.bootstrap && bootstrap.Toast) {
+        const toast = new bootstrap.Toast(toastElement, { delay: 5000 });
+        toast.show();
+        
+        toastElement.addEventListener('hidden.bs.toast', () => {
+            toastElement.remove();
+        });
+    } else {
+        setTimeout(() => {
+            toastElement.remove();
+        }, 5000);
+    }
+}
+</script>
+{% endblock %}

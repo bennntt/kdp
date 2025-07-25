@@ -1,0 +1,361 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Admin Dashboard - KDP Tools{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Overview / Dashboard</span>
+        </nav>
+    </div>
+    <div>
+        <button class="btn btn-gradient" onclick="location.reload()">
+            <i class="fas fa-sync-alt me-2"></i>Refresh Data
+        </button>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="stat-card">
+            <div class="stat-number">{{ stats.total_users }}</div>
+            <div class="stat-label">Total Users</div>
+            <div class="mt-2">
+                <small class="text-success">
+                    <i class="fas fa-arrow-up"></i>
+                    +{{ stats.new_users_week }} this week
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="stat-card success">
+            <div class="stat-number">{{ stats.paid_users }}</div>
+            <div class="stat-label">Premium Users</div>
+            <div class="mt-2">
+                <small class="text-info">
+                    ${{ stats.monthly_revenue }} monthly revenue
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="stat-card warning">
+            <div class="stat-number">{{ stats.new_users_today }}</div>
+            <div class="stat-label">New Today</div>
+            <div class="mt-2">
+                <small class="text-warning">
+                    <i class="fas fa-user-plus"></i>
+                    Registration rate
+                </small>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+        <div class="stat-card danger">
+            <div class="stat-number">{{ stats.unread_messages }}</div>
+            <div class="stat-label">Unread Messages</div>
+            <div class="mt-2">
+                <small class="text-danger">
+                    <i class="fas fa-envelope"></i>
+                    Pending responses
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Grid -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="admin-card">
+            <div class="card-header bg-transparent border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-chart-bar me-2 text-primary"></i>
+                        Tool Usage Statistics
+                    </h5>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.analytics') }}">View Analytics</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.tools_management') }}">Manage Tools</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for tool, usage_count in stats.popular_tools %}
+                    <div class="col-md-6 mb-3">
+                        <div class="d-flex justify-content-between align-items-center p-3 bg-dark rounded">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-circle me-3">
+                                    {% if 'title' in tool %}
+                                        <i class="fas fa-heading text-primary"></i>
+                                    {% elif 'subtitle' in tool %}
+                                        <i class="fas fa-text-height text-success"></i>
+                                    {% elif 'description' in tool %}
+                                        <i class="fas fa-align-left text-info"></i>
+                                    {% elif 'author' in tool %}
+                                        <i class="fas fa-user-edit text-warning"></i>
+                                    {% elif 'keyword' in tool %}
+                                        <i class="fas fa-search text-danger"></i>
+                                    {% elif 'category' in tool %}
+                                        <i class="fas fa-tags text-purple"></i>
+                                    {% elif 'royalty' in tool %}
+                                        <i class="fas fa-calculator text-success"></i>
+                                    {% elif 'trademark' in tool %}
+                                        <i class="fas fa-shield-alt text-orange"></i>
+                                    {% else %}
+                                        <i class="fas fa-tools text-secondary"></i>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    <div class="fw-semibold">{{ tool.replace('-', ' ').title() }}</div>
+                                    <small class="text-muted">Tool Usage</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="h5 mb-0 text-primary">{{ usage_count }}</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="mt-3 pt-3 border-top">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="text-muted small">Most Popular</div>
+                            <div class="fw-bold text-success">
+                                {% if stats.popular_tools %}
+                                    {{ stats.popular_tools[0][0].replace('-', ' ').title() }}
+                                {% else %}
+                                    No data
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Total Usage</div>
+                            <div class="fw-bold text-info">
+                                {{ stats.popular_tools | sum(attribute=1) if stats.popular_tools else 0 }}
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-muted small">Active Tools</div>
+                            <div class="fw-bold text-warning">
+                                {{ stats.popular_tools | length }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="admin-card h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-users me-2 text-success"></i>
+                    Recent Users
+                </h5>
+            </div>
+            <div class="card-body">
+                {% for user in recent_users %}
+                <div class="d-flex align-items-center mb-3 p-2 rounded bg-dark">
+                    <div class="user-avatar me-3">
+                        {{ user.first_name[0] if user.first_name else 'U' }}
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">{{ user.first_name }} {{ user.last_name }}</div>
+                        <small class="text-muted">{{ user.email }}</small>
+                        <div class="small">
+                            <span class="badge bg-{{ 'success' if user.subscription_type == 'monthly' else 'secondary' }} me-1">
+                                {{ user.subscription_type.title() }}
+                            </span>
+                            <span class="text-muted">{{ user.created_at.strftime('%b %d') }}</span>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.user_details', user_id=user.id) }}">View Details</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.user_details', user_id=user.id) }}#upgrade">Manage Subscription</a></li>
+                        </ul>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="fas fa-users fa-2x mb-3"></i>
+                    <div>No recent users</div>
+                </div>
+                {% endfor %}
+                
+                <div class="text-center mt-3">
+                    <a href="{{ url_for('admin.users') }}" class="btn btn-outline-primary btn-sm">
+                        <i class="fas fa-eye me-1"></i>View All Users
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Activity -->
+<div class="row">
+    <div class="col-12">
+        <div class="admin-card">
+            <div class="card-header bg-transparent border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-activity me-2 text-info"></i>
+                        Recent System Activity
+                    </h5>
+                    <a href="{{ url_for('admin.system_logs') }}" class="btn btn-outline-info btn-sm">
+                        <i class="fas fa-list me-1"></i>View All Logs
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table admin-table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th width="5%">
+                                    <i class="fas fa-exclamation-circle"></i>
+                                </th>
+                                <th width="20%">User</th>
+                                <th width="25%">Activity</th>
+                                <th width="30%">Details</th>
+                                <th width="20%">Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for activity in activities %}
+                            <tr class="searchable-row">
+                                <td>
+                                    {% if 'error' in activity.action.lower() or 'fail' in activity.action.lower() %}
+                                        <i class="fas fa-exclamation-triangle text-danger"></i>
+                                    {% elif 'warning' in activity.action.lower() or 'suspend' in activity.action.lower() %}
+                                        <i class="fas fa-exclamation-circle text-warning"></i>
+                                    {% elif 'login' in activity.action.lower() %}
+                                        <i class="fas fa-sign-in-alt text-success"></i>
+                                    {% else %}
+                                        <i class="fas fa-info-circle text-info"></i>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if activity.user %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="user-avatar me-2" style="width: 24px; height: 24px; font-size: 10px;">
+                                                {{ activity.user.first_name[0] if activity.user.first_name else 'U' }}
+                                            </div>
+                                            <div>
+                                                <div class="fw-semibold">{{ activity.user.first_name }} {{ activity.user.last_name }}</div>
+                                                <small class="text-muted">{{ activity.user.email }}</small>
+                                            </div>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">System</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">
+                                        {{ activity.action.replace('_', ' ').title() }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        {% if activity.details %}
+                                            {{ activity.details | truncate(50) }}
+                                        {% else %}
+                                            No details available
+                                        {% endif %}
+                                    </div>
+                                    {% if activity.ip_address %}
+                                    <small class="text-muted d-block">IP: {{ activity.ip_address }}</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
+                                    <small class="text-muted">{{ activity.timestamp.strftime('%A') }}</small>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted">
+                                    <i class="fas fa-inbox fa-2x mb-3"></i>
+                                    <div>No recent activity</div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Auto-refresh dashboard data every 5 minutes
+setInterval(function() {
+    if (document.visibilityState === 'visible') {
+        location.reload();
+    }
+}, 300000);
+
+// Real-time clock
+function updateClock() {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString();
+    const dateString = now.toLocaleDateString();
+    
+    // Update if clock element exists
+    const clockElement = document.getElementById('real-time-clock');
+    if (clockElement) {
+        clockElement.innerHTML = `${timeString}<br><small>${dateString}</small>`;
+    }
+}
+
+// Update clock every second
+setInterval(updateClock, 1000);
+updateClock();
+
+// Initialize tooltips for dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    // Add loading states to buttons
+    const actionButtons = document.querySelectorAll('.quick-action-btn');
+    actionButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            showLoading(this);
+        });
+    });
+    
+    // Initialize charts if needed
+    if (typeof Chart !== 'undefined') {
+        // Chart initialization would go here
+    }
+});
+</script>
+{% endblock %}

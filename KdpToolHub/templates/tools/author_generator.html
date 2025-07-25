@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Author Generator - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-user-edit me-2 text-primary"></i>Author Generator
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Author Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.language.label(class="form-label") }}
+                        {{ form.language(class="form-select") }}
+                        {% if form.language.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.language.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Choose the language for name generation
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.country.label(class="form-label") }}
+                        {{ form.country(class="form-select") }}
+                        {% if form.country.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.country.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Select the country for cultural context
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.gender.label.text }}</label>
+                        <div class="mt-2">
+                            {% for value, label in form.gender.choices %}
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="gender" id="gender_{{ value }}" value="{{ value }}" {% if value == 'male' or (form.gender.data == value) %}checked{% endif %}>
+                                    <label class="form-check-label" for="gender_{{ value }}">
+                                        {{ label }}
+                                    </label>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        {% if form.gender.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.gender.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Fields to generate:</label>
+                        <div class="row">
+                            <div class="col">
+                                <div class="form-check">
+                                    {{ form.prefix(class="form-check-input") }}
+                                    {{ form.prefix.label(class="form-check-label") }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    {{ form.first_name(class="form-check-input", disabled=True, checked=True) }}
+                                    {{ form.first_name.label(class="form-check-label text-muted") }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    {{ form.middle_name(class="form-check-input") }}
+                                    {{ form.middle_name.label(class="form-check-label") }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    {{ form.last_name(class="form-check-input", disabled=True, checked=True) }}
+                                    {{ form.last_name.label(class="form-check-label text-muted") }}
+                                </div>
+                            </div>
+                            <div class="col">
+                                <div class="form-check">
+                                    {{ form.suffix(class="form-check-input") }}
+                                    {{ form.suffix.label(class="form-check-label") }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-text">
+                            First Name and Last Name are always included
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-magic me-2"></i>Generate Author Names
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if results %}
+<div class="author-results-anchor" id="author-results"></div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Generated Author Names
+                    <span class="badge bg-success ms-2">{{ results|length }} names</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    {% for name in results %}
+                        <div class="col-md-6">
+                            <div class="result-item-hover p-3 border rounded">
+                                <!-- Full Name with Copy Button -->
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">{{ name.full_name }}</h6>
+                                        <small class="text-muted">by {{ name.full_name }}</small>
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" id="copyFullBtn-{{ loop.index }}"
+                                            onclick="copyToClipboard('{{ name.full_name|replace("'", "\\'") }}', 'copyFullBtn-{{ loop.index }}')">
+                                        <i class="fas fa-copy me-1"></i>Full Name
+                                    </button>
+                                </div>
+                                
+                                <!-- Name Components Horizontal -->
+                                <div class="name-components-horizontal d-flex flex-wrap gap-1">
+                                    {% if name.prefix %}
+                                    <div class="component-chip d-flex align-items-center">
+                                        <span class="component-value">{{ name.prefix }}</span>
+                                        <button class="btn-copy-chip" 
+                                                id="copyPrefix-{{ loop.index }}"
+                                                onclick="copyToClipboard('{{ name.prefix|replace("'", "\\'") }}', 'copyPrefix-{{ loop.index }}')"
+                                                title="Copy Prefix">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if name.first_name %}
+                                    <div class="component-chip d-flex align-items-center">
+                                        <span class="component-value">{{ name.first_name }}</span>
+                                        <button class="btn-copy-chip" 
+                                                id="copyFirstName-{{ loop.index }}"
+                                                onclick="copyToClipboard('{{ name.first_name|replace("'", "\\'") }}', 'copyFirstName-{{ loop.index }}')"
+                                                title="Copy First Name">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if name.middle_name %}
+                                    <div class="component-chip d-flex align-items-center">
+                                        <span class="component-value">{{ name.middle_name }}</span>
+                                        <button class="btn-copy-chip" 
+                                                id="copyMiddleName-{{ loop.index }}"
+                                                onclick="copyToClipboard('{{ name.middle_name|replace("'", "\\'") }}', 'copyMiddleName-{{ loop.index }}')"
+                                                title="Copy Middle Name">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if name.last_name %}
+                                    <div class="component-chip d-flex align-items-center">
+                                        <span class="component-value">{{ name.last_name }}</span>
+                                        <button class="btn-copy-chip" 
+                                                id="copyLastName-{{ loop.index }}"
+                                                onclick="copyToClipboard('{{ name.last_name|replace("'", "\\'") }}', 'copyLastName-{{ loop.index }}')"
+                                                title="Copy Last Name">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                    
+                                    {% if name.suffix %}
+                                    <div class="component-chip d-flex align-items-center">
+                                        <span class="component-value">{{ name.suffix }}</span>
+                                        <button class="btn-copy-chip" 
+                                                id="copySuffix-{{ loop.index }}"
+                                                onclick="copyToClipboard('{{ name.suffix|replace("'", "\\'") }}', 'copySuffix-{{ loop.index }}')"
+                                                title="Copy Suffix">
+                                            <i class="fas fa-copy"></i>
+                                        </button>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+
+<style>
+.result-item-hover {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.result-item-hover:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.component-chip {
+    background-color: rgba(255,255,255,0.05);
+    padding: 6px 12px;
+    margin: 2px;
+    border-radius: 6px;
+    transition: background-color 0.2s ease;
+}
+
+.component-chip:hover {
+    background-color: rgba(255,255,255,0.08);
+}
+
+.component-chip .component-value {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    font-weight: 500;
+    margin-right: 8px;
+    color: #fff;
+}
+
+.btn-copy-chip {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.7);
+    font-size: 0.75rem;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.btn-copy-chip:hover {
+    background-color: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.name-components-horizontal {
+    margin-top: 8px;
+    padding: 6px 0;
+    border-top: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Anchor positioning fix */
+.author-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+</style>
+
+<script>
+// Author generator functionality with scroll to results
+document.addEventListener('DOMContentLoaded', function() {
+    {% if results %}
+        // Scroll to results if they exist
+        setTimeout(function() {
+            const resultsElement = document.getElementById('author-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+
+function copyToClipboard(text, buttonId) {
+    navigator.clipboard.writeText(text).then(function() {
+        const button = document.getElementById(buttonId);
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+
+
+</script>
+{% endblock %}

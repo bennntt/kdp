@@ -1,0 +1,871 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<style>
+/* Force CSS Refresh - v3.0 - Dashboard Header Added */
+.hero-welcome-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+}
+
+.stat-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+}
+
+.tool-card {
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef !important;
+}
+
+.tool-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1) !important;
+    border-color: #007bff !important;
+}
+
+.tool-card.opacity-75 {
+    opacity: 0.6 !important;
+}
+
+.tool-card .progress-bar {
+    background: linear-gradient(90deg, #007bff, #0056b3);
+}
+
+/* Enhanced button animations and styles */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-3px); }
+    20%, 40%, 60%, 80% { transform: translateX(3px); }
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+.btn-shake {
+    animation: shake 0.6s ease-in-out;
+}
+
+.btn-pulse {
+    animation: pulse 1s ease-in-out;
+}
+
+/* Enhanced button styles for different states */
+.disabled-tool-btn {
+    cursor: not-allowed !important;
+    opacity: 0.8;
+    background: linear-gradient(45deg, #6c757d, #5a6268) !important;
+    border: none !important;
+    color: white !important;
+}
+
+.disabled-tool-btn:hover {
+    background: linear-gradient(45deg, #5a6268, #6c757d) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
+}
+
+.premium-tool-btn {
+    background: linear-gradient(45deg, #ffc107, #ff8f00) !important;
+    border: none !important;
+    color: #000 !important;
+    font-weight: 600;
+    position: relative;
+    overflow: hidden;
+}
+
+.premium-tool-btn:hover {
+    background: linear-gradient(45deg, #ff8f00, #ffc107) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(255, 193, 7, 0.4);
+}
+
+.premium-tool-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
+
+.premium-tool-btn:hover::before {
+    left: 100%;
+}
+
+.limit-tool-btn {
+    background: linear-gradient(45deg, #dc3545, #c82333) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.limit-tool-btn:hover {
+    background: linear-gradient(45deg, #c82333, #dc3545) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(220, 53, 69, 0.4);
+}
+
+.login-required-btn {
+    background: linear-gradient(45deg, #17a2b8, #138496) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: 600;
+}
+
+.login-required-btn:hover {
+    background: linear-gradient(45deg, #138496, #17a2b8) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(23, 162, 184, 0.4);
+}
+
+/* Flash message animations */
+.dashboard-flash {
+    animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Enhanced tool card hover effects */
+.tool-card:hover .premium-tool-btn {
+    box-shadow: 0 6px 12px rgba(255, 193, 7, 0.5);
+}
+
+.tool-card:hover .disabled-tool-btn {
+    box-shadow: 0 6px 12px rgba(108, 117, 125, 0.4);
+}
+
+.tool-card:hover .limit-tool-btn {
+    box-shadow: 0 6px 12px rgba(220, 53, 69, 0.5);
+}
+
+
+
+.activity-timeline .activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #f1f3f4, #e8eaed);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    border: 2px solid #e9ecef;
+}
+
+.empty-state i {
+    opacity: 0.5;
+}
+
+.tip-carousel {
+    position: relative;
+}
+
+.tip-item {
+    animation: tipFade 8s infinite;
+}
+
+@keyframes tipFade {
+    0%, 20%, 100% { opacity: 1; }
+    25%, 95% { opacity: 0.8; }
+}
+
+.text-purple {
+    color: #6f42c1 !important;
+}
+
+.backdrop-blur {
+    backdrop-filter: blur(10px);
+}
+
+/* Hero Avatar Styles */
+.hero-avatar {
+    width: 80px;
+    height: 80px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.hero-avatar-letter {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+
+
+
+
+.inspiration-quote {
+    position: relative;
+    overflow: hidden;
+}
+
+.inspiration-quote::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%) translateY(-100%) rotate(30deg);
+    }
+    100% {
+        transform: translateX(100%) translateY(100%) rotate(30deg);
+    }
+}
+
+.tip-item {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+@media (max-width: 768px) {
+    .hero-welcome-card h2 {
+        font-size: 1.5rem;
+    }
+    
+    .stat-card h3 {
+        font-size: 1.5rem;
+    }
+    
+    .quick-action-card {
+        padding: 1rem !important;
+    }
+    
+    .quick-action-card i {
+        font-size: 1.5rem !important;
+    }
+    
+
+}
+</style>
+
+
+<!-- Flash Messages will be shown as toast notifications -->
+
+
+
+
+<!-- Welcome Hero Section -->
+<div class="row mb-4 pt-4 pb-2 mb-3">
+    <div class="col-12">
+        <div class="hero-welcome-card position-relative overflow-hidden p-4 rounded-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="position-absolute top-0 end-0 opacity-25">
+                <i class="fas fa-book-open" style="font-size: 8rem; color: white;"></i>
+            </div>
+            <div class="position-relative text-white">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="hero-avatar me-3">
+                        <span class="hero-avatar-letter">{{ current_user.first_name[0].upper() if current_user.first_name else 'U' }}</span>
+                    </div>
+                    <h2 class="mb-0 fw-bold">Welcome back, {{ current_user.first_name }}!</h2>
+                </div>
+                <p class="mb-4 fs-5">
+                    {% if current_user.email_verified %}
+                        Ready to create your next bestseller? Your publishing journey continues here.
+                    {% else %}
+                        Please verify your email to unlock the full power of our KDP tools.
+                    {% endif %}
+                </p>
+                
+                {% if current_user.subscription_type == 'free' %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="p-3 rounded shadow-sm h-100 d-flex flex-column" style="background: #363844 !important;">
+                                <h6 class="mb-2 text-white">Today's Usage</h6>
+                                <div class="progress mb-2" style="height: 10px; background: rgba(255,255,255,0.2);">
+                                    <div class="progress-bar bg-warning" role="progressbar" 
+                                         style="width: {{ (current_user.daily_usage_count / 3 * 100) }}%">
+                                    </div>
+                                </div>
+                                <small class="text-white opacity-75">
+                                    {{ current_user.daily_usage_count }}/3 uses today
+                                </small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 rounded shadow-sm h-100 d-flex flex-column" style="background: #363844 !important;">
+                                <h6 class="mb-2 text-white">Unlock Your Potential</h6>
+                                <p class="small mb-2 text-white opacity-75 flex-grow-1">Unlimited access to all tools</p>
+                                <a href="{{ url_for('plans') }}" class="btn btn-warning btn-sm fw-bold">
+                                    <i class="fas fa-crown me-1"></i>Upgrade Now
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-crown text-warning me-2" style="font-size: 1.5rem;"></i>
+                        <span class="fs-5 fw-bold">{{ current_user.subscription_type.title() }} Member - Unlimited Access</span>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Verification Alert (positioned above Statistics Cards) -->
+{% if not current_user.email_verified %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="alert alert-warning fade show" role="alert" id="emailVerificationAlert" style="border-left: 4px solid #ffc107;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-exclamation-triangle me-3 text-warning" style="font-size: 1.2rem;"></i>
+                <div class="flex-grow-1">
+                    <h6 class="alert-heading mb-1 fw-semibold">Please verify your email address to access tools.</h6>
+                    <p class="mb-2 small">We've sent a verification email to <strong>{{ current_user.email }}</strong>. Please check your inbox and click the verification link.</p>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{{ url_for('auth.resend_verification') }}" class="btn btn-sm btn-outline-warning">
+                            <i class="fas fa-paper-plane me-1"></i>Resend Verification Email
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="showChangeEmailModal()">
+                            <i class="fas fa-edit me-1"></i>Change Email
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card h-100 p-3 border-0 shadow-sm rounded-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="fw-bold text-white mb-1">{{ recent_usage|length }}</h3>
+                    <p class="text-white opacity-75 mb-0 small">Tools Used</p>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-tools text-white opacity-50" style="font-size: 2.5rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card h-100 p-3 border-0 shadow-sm rounded-3" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="fw-bold text-white mb-1">{{ current_user.daily_usage_count }}</h3>
+                    <p class="text-white opacity-75 mb-0 small">Today's Usage</p>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-chart-line text-white opacity-50" style="font-size: 2.5rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card h-100 p-3 border-0 shadow-sm rounded-3" style="background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="fw-bold text-white mb-1">{{ unread_messages }}</h3>
+                    <p class="text-white opacity-75 mb-0 small">New Messages</p>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-envelope text-white opacity-50" style="font-size: 2.5rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="stat-card h-100 p-3 border-0 shadow-sm rounded-3" style="background: linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%);">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <h3 class="fw-bold text-white mb-1">8</h3>
+                    <p class="text-white opacity-75 mb-0 small">Available Tools</p>
+                </div>
+                <div class="stat-icon">
+                    <i class="fas fa-cogs text-white opacity-50" style="font-size: 2.5rem;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+
+
+
+
+<!-- Available Tools Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tools me-2"></i>Available Tools
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if available_tools %}
+                    <div class="row g-3">
+                        {% for tool_info in available_tools %}
+                            {% set tool = tool_info.config %}
+                            {% if tool and tool.is_enabled %}
+                            <div class="col-lg-3 col-md-4 col-sm-6">
+                                <div class="tool-card h-100 p-3 border rounded-3 position-relative {% if not tool_info.available %}opacity-75{% endif %}">
+                                    <!-- Status Badge -->
+                                    {% if not tool_info.available %}
+                                        <div class="position-absolute top-0 end-0 p-2">
+                                            {% if 'premium' in tool_info.reason.lower() %}
+                                                <span class="badge bg-warning text-dark">
+                                                    <i class="fas fa-crown"></i> Premium
+                                                </span>
+                                            {% elif 'disabled' in tool_info.reason.lower() %}
+                                                <span class="badge bg-secondary">
+                                                    <i class="fas fa-pause"></i> Disabled
+                                                </span>
+                                            {% elif 'limit' in tool_info.reason.lower() %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-exclamation-triangle"></i> Limit
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    {% elif tool.requires_paid_plan %}
+                                        <div class="position-absolute top-0 end-0 p-2">
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="fas fa-crown"></i> Premium
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- Tool Icon -->
+                                    <div class="text-center mb-3">
+                                        <i class="{{ tool.icon or 'fas fa-tool' }} text-primary" style="font-size: 2.5rem;"></i>
+                                    </div>
+                                    
+                                    <!-- Tool Info -->
+                                    <h6 class="fw-bold text-center mb-2">{{ tool.display_name }}</h6>
+                                    <p class="text-muted small text-center mb-3">{{ tool.description[:60] }}{% if tool.description|length > 60 %}...{% endif %}</p>
+                                    
+                                    <!-- Usage Stats -->
+                                    {% if tool_info.usage_stats %}
+                                        <div class="mb-3">
+                                            <div class="d-flex justify-content-between small text-muted mb-1">
+                                                <span>Today: {{ tool_info.usage_stats.today_uses }}/{{ tool_info.usage_stats.daily_limit }}</span>
+                                                <span>Total: {{ tool_info.usage_stats.total_uses }}</span>
+                                            </div>
+                                            {% if tool_info.usage_stats.daily_limit > 0 %}
+                                                <div class="progress" style="height: 4px;">
+                                                    <div class="progress-bar" role="progressbar" 
+                                                         style="width: {{ (tool_info.usage_stats.today_uses / tool_info.usage_stats.daily_limit * 100) if tool_info.usage_stats.daily_limit > 0 else 0 }}%">
+                                                    </div>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <!-- Action Button -->
+                                    <div class="text-center">
+                                        {% if tool_info.available %}
+                                            <a href="{{ url_for('tools.' + tool.tool_name) }}" class="btn btn-primary btn-sm w-100">
+                                                <i class="fas fa-play"></i> Use Tool
+                                            </a>
+                                        {% else %}
+                                            <!-- Enhanced disabled/premium buttons with flash messages -->
+                                            {% if 'disabled' in tool_info.reason.lower() %}
+                                                <button class="btn btn-secondary btn-sm w-100 disabled-tool-btn" 
+                                                        data-tool-name="{{ tool.display_name }}"
+                                                        data-reason="This tool is currently under maintenance. Please try again later."
+                                                        title="Tool is disabled">
+                                                    <i class="fas fa-pause-circle"></i> Tool Disabled
+                                                </button>
+                                            {% elif 'premium' in tool_info.reason.lower() or tool.requires_paid_plan %}
+                                                <button class="btn btn-warning btn-sm w-100 premium-tool-btn" 
+                                                        data-tool-name="{{ tool.display_name }}"
+                                                        data-reason="This tool requires a premium subscription. Please upgrade your account to access it."
+                                                        title="Premium tool">
+                                                    <i class="fas fa-crown"></i> Premium Only
+                                                </button>
+                                            {% elif 'limit' in tool_info.reason.lower() %}
+                                                <button class="btn btn-danger btn-sm w-100 limit-tool-btn" 
+                                                        data-tool-name="{{ tool.display_name }}"
+                                                        data-reason="{{ tool_info.reason }}"
+                                                        title="Daily limit reached">
+                                                    <i class="fas fa-exclamation-triangle"></i> Limit Reached
+                                                </button>
+                                            {% elif 'login' in tool_info.reason.lower() %}
+                                                <button class="btn btn-info btn-sm w-100 login-required-btn" 
+                                                        data-tool-name="{{ tool.display_name }}"
+                                                        data-reason="Please login to access this tool."
+                                                        title="Login required">
+                                                    <i class="fas fa-sign-in-alt"></i> Login Required
+                                                </button>
+                                            {% else %}
+                                                <button class="btn btn-secondary btn-sm w-100 disabled-tool-btn" 
+                                                        data-tool-name="{{ tool.display_name }}"
+                                                        data-reason="{{ tool_info.reason }}"
+                                                        title="{{ tool_info.reason }}">
+                                                    <i class="fas fa-lock"></i> Not Available
+                                                </button>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-tools text-muted" style="font-size: 3rem;"></i>
+                        <h6 class="text-muted mt-3">No tools available</h6>
+                        <p class="text-muted small">Please contact administrator</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity & Tips -->
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Activity
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_usage %}
+                    <div class="activity-timeline">
+                        {% for usage in recent_usage %}
+                            <div class="activity-item d-flex align-items-start mb-3">
+                                <div class="activity-icon me-3">
+                                    {% set tool_icons = {
+                                        'title_generator': 'fas fa-heading text-primary',
+                                        'subtitle_generator': 'fas fa-text-width text-success',
+                                        'description_generator': 'fas fa-align-left text-info',
+                                        'author_generator': 'fas fa-user-edit text-warning',
+                                        'keyword_research': 'fas fa-search text-purple',
+                                        'royalty_calculator': 'fas fa-calculator text-danger',
+                                        'category_finder': 'fas fa-tags text-secondary',
+                                        'trademark_search': 'fas fa-shield-alt text-dark'
+                                    } %}
+                                    <i class="{{ tool_icons.get(usage.tool_name, 'fas fa-cog text-muted') }}" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <h6 class="mb-1">{{ usage.tool_name.replace('_', ' ').title() }}</h6>
+                                    <p class="text-muted small mb-1">{{ usage.timestamp.strftime('%B %d, %Y at %I:%M %p') }}</p>
+                                    <span class="badge bg-success bg-opacity-10 text-success">
+                                        <i class="fas fa-check me-1"></i>Completed
+                                    </span>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+
+                {% else %}
+                    <div class="text-center py-5">
+                        <div class="empty-state">
+                            <i class="fas fa-rocket text-muted mb-3" style="font-size: 4rem;"></i>
+                            <h6 class="text-muted mb-2">Ready to Get Started?</h6>
+                            <p class="text-muted small mb-3">Use our powerful KDP tools to create amazing content</p>
+                            <a href="{{ url_for('tools.title_generator') }}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-play me-1"></i>Start Creating
+                            </a>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <!-- Tips & Messages -->
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Pro Tips
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="tip-carousel">
+                    <div class="tip-item p-3 rounded-3" style="background: linear-gradient(45deg, #ffeaa7, #fab1a0);">
+                        <h6 class="text-white fw-bold mb-2">💡 Title Generator Tip</h6>
+                        <p class="text-white small mb-0">Use specific keywords in your book titles to improve discoverability on Amazon.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-envelope me-2"></i>Messages
+                    {% if unread_messages > 0 %}
+                        <span class="badge bg-danger ms-2">{{ unread_messages }}</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if unread_messages > 0 %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        You have {{ unread_messages }} unread message{{ 's' if unread_messages != 1 else '' }}
+                    </div>
+                    <a href="{{ url_for('tools.messages') }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-envelope-open me-1"></i>Read Messages
+                    </a>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                        <p class="text-muted small mt-2 mb-0">All caught up!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Quick Stats -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-bar me-2"></i>Account Info
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="p-2">
+                            <h6 class="text-primary mb-1">{{ current_user.subscription_type.title() }}</h6>
+                            <small class="text-muted">Plan Type</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2">
+                            <h6 class="text-primary mb-1">{{ current_user.created_at.strftime('%B %Y') }}</h6>
+                            <small class="text-muted">Member Since</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+
+
+<script>
+
+
+
+
+// Auto-rotating tips
+const tips = [
+    {
+        icon: "💡",
+        title: "Title Generator Tip",
+        text: "Use specific keywords in your book titles to improve discoverability on Amazon.",
+        gradient: "linear-gradient(45deg, #ffeaa7, #fab1a0)"
+    },
+    {
+        icon: "✍️",
+        title: "Description Tip",
+        text: "Keep your book descriptions between 150-300 words for optimal readability.",
+        gradient: "linear-gradient(45deg, #74b9ff, #0984e3)"
+    },
+    {
+        icon: "📊",
+        title: "Royalty Tip",
+        text: "Consider all marketplace costs when setting your book price for maximum profit.",
+        gradient: "linear-gradient(45deg, #fd79a8, #e84393)"
+    },
+    {
+        icon: "🎯",
+        title: "Keywords Tip",
+        text: "Research competitor keywords to find gaps in the market for your book.",
+        gradient: "linear-gradient(45deg, #00b894, #00a085)"
+    }
+];
+
+let currentTipIndex = 0;
+
+function rotateTips() {
+    const tipElement = document.querySelector('.tip-item');
+    if (tipElement) {
+        currentTipIndex = (currentTipIndex + 1) % tips.length;
+        const tip = tips[currentTipIndex];
+        
+        tipElement.style.opacity = '0';
+        setTimeout(() => {
+            tipElement.innerHTML = `
+                <h6 class="text-white fw-bold mb-2">${tip.icon} ${tip.title}</h6>
+                <p class="text-white small mb-0">${tip.text}</p>
+            `;
+            tipElement.style.background = tip.gradient;
+            tipElement.style.opacity = '1';
+        }, 300);
+    }
+}
+
+// Rotate tips every 5 seconds
+setInterval(rotateTips, 5000);
+
+// Handle tool button interactions
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle disabled tool buttons
+    document.querySelectorAll('.disabled-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message
+            showDashboardFlashMessage('warning', `${toolName}: ${reason}`);
+            
+            // Add visual feedback
+            this.classList.add('btn-shake');
+            setTimeout(() => {
+                this.classList.remove('btn-shake');
+            }, 600);
+        });
+    });
+    
+    // Handle premium tool buttons
+    document.querySelectorAll('.premium-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message with upgrade link
+            showDashboardFlashMessage('info', `${toolName}: ${reason} <a href="/plans" class="alert-link">Upgrade Now</a>`);
+            
+            // Add visual feedback
+            this.classList.add('btn-pulse');
+            setTimeout(() => {
+                this.classList.remove('btn-pulse');
+            }, 1000);
+        });
+    });
+    
+    // Handle limit reached buttons
+    document.querySelectorAll('.limit-tool-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message
+            showDashboardFlashMessage('warning', `${toolName}: ${reason}`);
+            
+            // Add visual feedback
+            this.classList.add('btn-shake');
+            setTimeout(() => {
+                this.classList.remove('btn-shake');
+            }, 600);
+        });
+    });
+    
+    // Handle login required buttons
+    document.querySelectorAll('.login-required-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const toolName = this.getAttribute('data-tool-name');
+            const reason = this.getAttribute('data-reason');
+            
+            // Show flash message with login link
+            showDashboardFlashMessage('info', `${toolName}: ${reason} <a href="/auth/login" class="alert-link">Login Now</a>`);
+            
+            // Add visual feedback
+            this.classList.add('btn-pulse');
+            setTimeout(() => {
+                this.classList.remove('btn-pulse');
+            }, 1000);
+        });
+    });
+});
+
+// Function to show flash messages in dashboard
+function showDashboardFlashMessage(type, message) {
+    // Remove existing flash messages
+    const existingFlashes = document.querySelectorAll('.dashboard-flash');
+    existingFlashes.forEach(flash => flash.remove());
+    
+    // Create new flash message
+    const flashDiv = document.createElement('div');
+    flashDiv.className = `alert alert-${type} alert-dismissible fade show dashboard-flash`;
+    flashDiv.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 350px;
+        max-width: 500px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        border-radius: 8px;
+    `;
+    
+    const iconMap = {
+        'warning': 'fas fa-exclamation-triangle',
+        'info': 'fas fa-info-circle',
+        'danger': 'fas fa-times-circle',
+        'success': 'fas fa-check-circle'
+    };
+    
+    flashDiv.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="${iconMap[type] || 'fas fa-info-circle'} me-2"></i>
+            <div class="flex-grow-1">${message}</div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(flashDiv);
+    
+    // Auto remove after 6 seconds
+    setTimeout(() => {
+        if (flashDiv.parentNode) {
+            flashDiv.remove();
+        }
+    }, 6000);
+}
+</script>
+{% endblock %}

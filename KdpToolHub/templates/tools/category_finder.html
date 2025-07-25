@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block title %}Category Finder - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-tags me-2 text-primary"></i>Category Finder
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-search me-2"></i>Category Search
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="search-container">
+                    <div class="input-group input-group-lg">
+                        <input type="text" id="mainSearch" class="form-control" 
+                               placeholder="Enter keyword or category..." 
+                               onkeypress="handleEnterKey(event)"
+                               style="font-size: 1.1rem; padding: 0.75rem 1rem;">
+                        <button class="btn btn-primary btn-lg" type="button" onclick="searchCategories()">
+                            <i class="fas fa-search me-2"></i>Search
+                        </button>
+                    </div>
+                    <small class="text-muted mt-2 d-block">
+                        Search for categories by keyword (e.g., "coloring", "romance", "business")
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+<div class="category-results-anchor" id="category-results"></div>
+<div class="row mt-4" id="results-section" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-sitemap me-2"></i>Categories
+                    <span class="badge bg-success" id="categoryCount">0 categories</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div id="categoriesList">
+                    <!-- Categories will be loaded here by JavaScript -->
+                </div>
+                
+                <!-- Pagination Section -->
+                <div id="pagination-section" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mt-4">
+                        <!-- Results Info on Left -->
+                        <div class="pagination-info">
+                            <span class="text-muted" id="pagination-info-text">
+                                <!-- Will be populated by JavaScript -->
+                            </span>
+                        </div>
+                        
+                        <!-- Pagination Controls on Right -->
+                        <nav aria-label="Category search pagination">
+                            <ul class="pagination pagination-sm mb-0" id="pagination-controls">
+                                <!-- Will be populated by JavaScript -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+                
+                <!-- No results message for search -->
+                <div id="noSearchResults" class="text-center py-5" style="display: none;">
+                    <i class="fas fa-search text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="mt-3 text-muted">No categories match your search</h5>
+                    <p class="text-muted">Try different keywords or clear the search filter.</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+.category-item-hover {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.category-item-hover:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Anchor positioning fix */
+.category-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+</style>
+
+<script>
+let currentResults = [];
+let currentSearchTerm = '';
+let currentPage = 1;
+let totalPages = 0;
+let totalResults = 0;
+
+// Load categories on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllCategories();
+});
+
+function loadAllCategories() {
+    // Don't show all categories initially, just show search message
+    currentResults = [];
+    currentSearchTerm = '';
+    currentPage = 1;
+    totalPages = 0;
+    totalResults = 0;
+    displayCategories(currentResults);
+    document.getElementById('categoryCount').textContent = '0 categories';
+    // Hide results section initially
+    document.getElementById('results-section').style.display = 'none';
+    document.getElementById('pagination-section').style.display = 'none';
+}
+
+function searchCategories(page = 1) {
+    const searchTerm = document.getElementById('mainSearch').value.trim();
+    
+    if (searchTerm.length === 0) {
+        // Reset to initial state
+        currentResults = [];
+        currentSearchTerm = '';
+        currentPage = 1;
+        totalPages = 0;
+        totalResults = 0;
+        displayCategories(currentResults);
+        document.getElementById('categoryCount').textContent = '0 categories';
+        document.getElementById('results-section').style.display = 'none';
+        document.getElementById('pagination-section').style.display = 'none';
+        return;
+    }
+    
+    currentSearchTerm = searchTerm;
+    currentPage = page;
+    
+    // Show loading state
+    document.getElementById('results-section').style.display = 'block';
+    document.getElementById('categoriesList').innerHTML = '<div class="text-center py-3"><i class="fas fa-spinner fa-spin"></i> Searching...</div>';
+    
+    // Make API call to search categories
+    fetch('/tools/api/search-categories', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            search_term: searchTerm,
+            page: page
+        }),
+        credentials: 'same-origin'
+    })
+    .then(response => {
+        if (!response.ok) {
+            if (response.status === 403) {
+                window.location.href = '/auth/login';
+                return;
+            }
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        
+        currentResults = data.categories;
+        totalResults = data.total_results;
+        totalPages = data.total_pages;
+        currentPage = data.current_page;
+        
+        displayCategories(currentResults);
+        updatePagination();
+        
+        // Update category count
+        document.getElementById('categoryCount').textContent = totalResults + ' categories';
+        
+        // Show no results message if needed
+        const noResults = document.getElementById('noSearchResults');
+        if (totalResults === 0 && searchTerm.length > 0) {
+            noResults.style.display = 'block';
+            document.getElementById('pagination-section').style.display = 'none';
+        } else {
+            noResults.style.display = 'none';
+            if (totalPages > 1) {
+                document.getElementById('pagination-section').style.display = 'block';
+            } else {
+                document.getElementById('pagination-section').style.display = 'none';
+            }
+        }
+        
+        // Scroll to results after successful search (only for page 1)
+        if (page === 1) {
+            setTimeout(function() {
+                const resultsElement = document.getElementById('category-results');
+                if (resultsElement) {
+                    resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            }, 100);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('categoriesList').innerHTML = '<div class="text-center py-3 text-danger"><i class="fas fa-exclamation-triangle"></i> Error searching categories</div>';
+    });
+}
+
+function handleEnterKey(event) {
+    if (event.key === 'Enter') {
+        searchCategories();
+    }
+}
+
+function displayCategories(categories) {
+    const categoriesList = document.getElementById('categoriesList');
+    const defaultMessage = document.getElementById('defaultMessage');
+    
+    if (categories.length === 0) {
+        categoriesList.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    categories.forEach(category => {
+        const pathParts = category.path.split(' > ');
+        const badges = pathParts.map(part => 
+            `<span class="badge bg-secondary">${part.trim()}</span>`
+        ).join('<i class="fas fa-chevron-right mx-1"></i>');
+        
+        html += `
+            <div class="category-item-hover p-3 border rounded mb-3">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div class="mb-2">
+                            <strong class="text-primary">Category Name:</strong>
+                            <span class="ms-2">${category.name}</span>
+                        </div>
+                        <div class="mb-2">
+                            <div class="mt-1">
+                                <code class="text-light bg-dark p-1 rounded">${category.path}</code>
+                            </div>
+                        </div>
+
+                    </div>
+                    <div class="ms-3">
+                        <button class="btn btn-sm btn-outline-secondary" id="copyBtn-${category.id}"
+                                onclick="copyToClipboard('${category.path.replace(/'/g, "\\'")}', 'copyBtn-${category.id}')">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    categoriesList.innerHTML = html;
+}
+
+function handleEnterKey(event) {
+    if (event.key === 'Enter') {
+        searchCategories();
+    }
+}
+function copyToClipboard(text, buttonId) {
+    navigator.clipboard.writeText(text).then(function() {
+        const button = document.getElementById(buttonId);
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i> Copied';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+
+// Pagination functions
+function goToPage(page) {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+        searchCategories(page);
+    }
+}
+
+function updatePagination() {
+    const paginationInfo = document.getElementById('pagination-info-text');
+    const paginationControls = document.getElementById('pagination-controls');
+    
+    if (totalPages <= 1) {
+        document.getElementById('pagination-section').style.display = 'none';
+        return;
+    }
+    
+    // Update pagination info
+    const start = ((currentPage - 1) * 20) + 1;
+    const end = Math.min(currentPage * 20, totalResults);
+    paginationInfo.textContent = `Showing ${start} - ${end} of ${totalResults} results`;
+    
+    // Generate pagination controls
+    let paginationHTML = '';
+    
+    // Previous button
+    if (currentPage > 1) {
+        paginationHTML += `
+            <li class="page-item">
+                <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(${currentPage - 1})" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </a>
+            </li>`;
+    } else {
+        paginationHTML += `
+            <li class="page-item disabled">
+                <span class="page-link bg-transparent border-secondary text-muted" aria-label="Previous">
+                    <span aria-hidden="true">&laquo;</span>
+                </span>
+            </li>`;
+    }
+    
+    // Page numbers
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    if (startPage > 1) {
+        paginationHTML += `
+            <li class="page-item">
+                <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(1)">1</a>
+            </li>`;
+        if (startPage > 2) {
+            paginationHTML += `
+                <li class="page-item disabled">
+                    <span class="page-link bg-transparent border-secondary text-muted">...</span>
+                </li>`;
+        }
+    }
+    
+    for (let p = startPage; p <= endPage; p++) {
+        if (p === currentPage) {
+            paginationHTML += `
+                <li class="page-item active">
+                    <span class="page-link bg-secondary border-secondary text-white">${p}</span>
+                </li>`;
+        } else {
+            paginationHTML += `
+                <li class="page-item">
+                    <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(${p})">${p}</a>
+                </li>`;
+        }
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            paginationHTML += `
+                <li class="page-item disabled">
+                    <span class="page-link bg-transparent border-secondary text-muted">...</span>
+                </li>`;
+        }
+        paginationHTML += `
+            <li class="page-item">
+                <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(${totalPages})">${totalPages}</a>
+            </li>`;
+    }
+    
+    // Next button
+    if (currentPage < totalPages) {
+        paginationHTML += `
+            <li class="page-item">
+                <a class="page-link bg-transparent border-secondary text-light" href="#" onclick="goToPage(${currentPage + 1})" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </a>
+            </li>`;
+    } else {
+        paginationHTML += `
+            <li class="page-item disabled">
+                <span class="page-link bg-transparent border-secondary text-muted" aria-label="Next">
+                    <span aria-hidden="true">&raquo;</span>
+                </span>
+            </li>`;
+    }
+    
+    paginationControls.innerHTML = paginationHTML;
+    document.getElementById('pagination-section').style.display = 'block';
+}
+
+</script>
+{% endblock %}

@@ -1,0 +1,226 @@
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Royalty Calculations
+                </h5>
+            </div>
+            <div class="card-body">
+                
+                    <!-- Book Specifications Summary -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-book text-info" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Book Type</h6>
+                                <h5 class="text-info">Paperback</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-palette text-warning" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Interior Type</h6>
+                                <h5 class="text-warning">Black &amp; White</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-file-alt text-secondary" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Page Count</h6>
+                                <h5 class="text-secondary">100</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-dollar-sign text-primary" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Base Price</h6>
+                                <h5 class="text-primary">10.0 USD</h5>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- All Marketplaces Table -->
+                    <div class="marketplaces-table-section mb-4">
+                        <h6 class="text-secondary mb-3">
+                            <i class="fas fa-globe me-2"></i>Royalty Calculations Across All Marketplaces
+                        </h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover marketplace-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Marketplace</th>
+                                        <th>List Price</th>
+                                        <th>Royalty Rate</th>
+                                        <th>Minimum List Price</th>
+                                        <th>Printing Cost</th>
+                                        <th>Estimated Royalty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.com
+                                        </td>
+                                        <td class="text-primary fw-bold">$ 10.00</td>
+                                        <td class="text-success">60%</td>
+                                        <td class="text-info">$ 3.08</td>
+                                        <td class="text-warning">$ 1.85</td>
+                                        <td class="text-success fw-bold">$ 4.15</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.co.uk
+                                        </td>
+                                        <td class="text-primary fw-bold">£ 7.43</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">£ 3.70</td>
+                                        <td class="text-warning">£ 1.85</td>
+                                        <td class="text-success fw-bold">£ 1.86</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.de
+                                        </td>
+                                        <td class="text-primary fw-bold">€ 8.58</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">€ 3.70</td>
+                                        <td class="text-warning">€ 1.85</td>
+                                        <td class="text-success fw-bold">€ 2.44</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.fr
+                                        </td>
+                                        <td class="text-primary fw-bold">€ 8.58</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">€ 3.70</td>
+                                        <td class="text-warning">€ 1.85</td>
+                                        <td class="text-success fw-bold">€ 2.44</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.es
+                                        </td>
+                                        <td class="text-primary fw-bold">€ 8.58</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">€ 3.70</td>
+                                        <td class="text-warning">€ 1.85</td>
+                                        <td class="text-success fw-bold">€ 2.44</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.it
+                                        </td>
+                                        <td class="text-primary fw-bold">€ 8.58</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">€ 3.70</td>
+                                        <td class="text-warning">€ 1.85</td>
+                                        <td class="text-success fw-bold">€ 2.44</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.nl
+                                        </td>
+                                        <td class="text-primary fw-bold">€ 8.58</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">€ 3.70</td>
+                                        <td class="text-warning">€ 1.85</td>
+                                        <td class="text-success fw-bold">€ 2.44</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.pl
+                                        </td>
+                                        <td class="text-primary fw-bold">zł 36.48</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">zł 3.70</td>
+                                        <td class="text-warning">zł 1.85</td>
+                                        <td class="text-success fw-bold">zł 16.39</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.se
+                                        </td>
+                                        <td class="text-primary fw-bold">kr 96.57</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">kr 3.70</td>
+                                        <td class="text-warning">kr 1.85</td>
+                                        <td class="text-success fw-bold">kr 46.43</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.co.jp
+                                        </td>
+                                        <td class="text-primary fw-bold">¥ 1484.50</td>
+                                        <td class="text-success">60%</td>
+                                        <td class="text-info">¥ 3.08</td>
+                                        <td class="text-warning">¥ 1.85</td>
+                                        <td class="text-success fw-bold">¥ 888.85</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.ca
+                                        </td>
+                                        <td class="text-primary fw-bold">$ 13.72</td>
+                                        <td class="text-success">50%</td>
+                                        <td class="text-info">$ 3.70</td>
+                                        <td class="text-warning">$ 1.85</td>
+                                        <td class="text-success fw-bold">$ 5.01</td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            Amazon.com.au
+                                        </td>
+                                        <td class="text-primary fw-bold">$ 15.32</td>
+                                        <td class="text-success">60%</td>
+                                        <td class="text-info">$ 3.08</td>
+                                        <td class="text-warning">$ 1.85</td>
+                                        <td class="text-success fw-bold">$ 7.34</td>
+                                    </tr>
+                                    
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                
+            </div>
+        </div>
+    </div>
+</div>

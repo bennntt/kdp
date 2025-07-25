@@ -1,0 +1,209 @@
+                                <!-- Account Settings Tab -->
+                                <div class="tab-pane fade show active" id="v-pills-account" role="tabpanel">
+                                    <div class="settings-section">
+                                        <div class="row">
+                                            <div class="col-12">
+                                                <h4 class="text-primary mb-4"><i class="fas fa-user-circle me-2"></i>Account Information</h4>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Personal Information -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4">
+                                                    <h5 class="fw-semibold mb-4 text-info">Personal Information</h5>
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <label for="firstName" class="form-label fw-semibold">First Name</label>
+                                                            <input type="text" class="form-control settings-input" id="firstName" value="{{ current_user.first_name if current_user.is_authenticated else '' }}">
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <label for="lastName" class="form-label fw-semibold">Last Name</label>
+                                                            <input type="text" class="form-control settings-input" id="lastName" value="{{ current_user.last_name if current_user.is_authenticated else '' }}">
+                                                        </div>
+                                                        <div class="col-12 mb-3">
+                                                            <label for="currentEmail" class="form-label fw-semibold">Current Email</label>
+                                                            <div class="input-group">
+                                                                <input type="email" class="form-control settings-input" id="currentEmail" value="{{ current_user.email if current_user.is_authenticated else '' }}" readonly>
+                                                                <button class="btn btn-outline-warning" type="button" onclick="showChangeEmailForm()">
+                                                                    <i class="fas fa-edit"></i> Change Email
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Location Information -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4">
+                                                    <h5 class="fw-semibold mb-4 text-info">Location Information</h5>
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <label for="country" class="form-label fw-semibold">Country</label>
+                                                            <input type="text" class="form-control settings-input" id="country" value="{{ current_user.country if current_user.is_authenticated else '' }}" placeholder="Enter your country">
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <label for="city" class="form-label fw-semibold">City</label>
+                                                            <input type="text" class="form-control settings-input" id="city" value="{{ current_user.city if current_user.is_authenticated else '' }}" placeholder="Enter your city">
+                                                        </div>
+                                                        <div class="col-12 mb-3">
+                                                            <label for="address" class="form-label fw-semibold">Address</label>
+                                                            <textarea class="form-control settings-input" id="address" rows="3" placeholder="Enter your full address">{{ current_user.address if current_user.is_authenticated else '' }}</textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Security Actions -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4 border-warning">
+                                                    <h5 class="fw-semibold mb-4 text-warning"><i class="fas fa-shield-alt me-2"></i>Security Settings</h5>
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <button class="btn btn-outline-warning w-100" onclick="showChangePasswordForm()">
+                                                                <i class="fas fa-key me-2"></i>Change Password
+                                                            </button>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <button class="btn btn-outline-danger w-100" onclick="showDeleteAccountForm()">
+                                                                <i class="fas fa-trash me-2"></i>Delete Account
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Subscription Tab -->
+                                <div class="tab-pane fade" id="v-pills-subscription" role="tabpanel">
+                                    <div class="settings-section">
+                                        <div class="row">
+                                            <div class="col-12">
+                                                <h4 class="text-primary mb-4"><i class="fas fa-crown me-2"></i>Subscription Management</h4>
+                                            </div>
+                                        </div>
+
+                                        <!-- Current Plan -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4">
+                                                    <h5 class="fw-semibold mb-4 text-info">Current Plan</h5>
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-8">
+                                                            <div class="d-flex align-items-center mb-3">
+                                                                <span class="badge bg-{{ 'success' if current_user.subscription_type != 'free' else 'secondary' }} fs-6 me-3 px-3 py-2">
+                                                                    {{ current_user.subscription_type.title() if current_user.is_authenticated else 'Free' }} Plan
+                                                                </span>
+                                                                {% if current_user.is_authenticated and current_user.subscription_type != 'free' %}
+                                                                <span class="text-success">
+                                                                    <i class="fas fa-check-circle me-1"></i>Active
+                                                                </span>
+                                                                {% endif %}
+                                                            </div>
+                                                            {% if current_user.is_authenticated and current_user.subscription_end %}
+                                                            <div class="mb-2">
+                                                                <strong>Started:</strong> {{ current_user.subscription_start.strftime('%B %d, %Y') if current_user.subscription_start else 'N/A' }}
+                                                            </div>
+                                                            <div class="mb-2">
+                                                                <strong>Expires:</strong> {{ current_user.subscription_end.strftime('%B %d, %Y') }}
+                                                            </div>
+                                                            <div class="mb-2">
+                                                                <strong>Time Remaining:</strong> 
+                                                                <span id="timeRemaining" class="text-info"></span>
+                                                            </div>
+                                                            <div class="mb-2">
+                                                                <strong>Auto Renewal:</strong> 
+                                                                <span class="badge bg-success">Enabled</span>
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="col-md-4 text-end">
+                                                            <button class="btn btn-outline-primary mb-2 w-100">
+                                                                <i class="fas fa-arrow-up me-2"></i>Upgrade Plan
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Payment Method -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4">
+                                                    <h5 class="fw-semibold mb-4 text-info">Payment Method</h5>
+                                                    <div class="row align-items-center">
+                                                        <div class="col-md-8">
+                                                            {% if current_user.is_authenticated and current_user.stripe_customer_id %}
+                                                            <div class="d-flex align-items-center mb-3">
+                                                                <i class="fas fa-credit-card text-primary me-3 fa-2x"></i>
+                                                                <div>
+                                                                    <div class="fw-semibold">**** **** **** 1234</div>
+                                                                    <small class="text-muted">Visa ending in 1234 • Expires 12/25</small>
+                                                                </div>
+                                                            </div>
+                                                            {% else %}
+                                                            <div class="text-muted">
+                                                                <i class="fas fa-info-circle me-2"></i>No payment method on file
+                                                            </div>
+                                                            {% endif %}
+                                                        </div>
+                                                        <div class="col-md-4 text-end">
+                                                            <button class="btn btn-outline-info mb-2 w-100">
+                                                                <i class="fas fa-edit me-2"></i>Update Payment
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Billing History -->
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4">
+                                                    <h5 class="fw-semibold mb-4 text-info">Payment History</h5>
+                                                    <div id="billingHistory">
+                                                        <div class="text-center py-4">
+                                                            <i class="fas fa-file-invoice fa-2x text-muted mb-2"></i>
+                                                            <div class="text-muted">No billing history available</div>
+                                                        </div>
+                                                    </div>
+                                                    <button class="btn btn-outline-info btn-sm" onclick="loadBillingHistory()">
+                                                        <i class="fas fa-sync me-1"></i>Refresh History
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Subscription Actions -->
+                                        {% if current_user.is_authenticated and current_user.subscription_type != 'free' %}
+                                        <div class="row mb-4">
+                                            <div class="col-xl-8 col-lg-10">
+                                                <div class="settings-card p-4 border-danger">
+                                                    <h5 class="fw-semibold mb-4 text-danger"><i class="fas fa-exclamation-triangle me-2"></i>Subscription Control</h5>
+                                                    <div class="row">
+                                                        <div class="col-md-6 mb-3">
+                                                            <button class="btn btn-outline-warning w-100">
+                                                                <i class="fas fa-pause me-2"></i>Pause Subscription
+                                                            </button>
+                                                        </div>
+                                                        <div class="col-md-6 mb-3">
+                                                            <button class="btn btn-outline-danger w-100" onclick="showCancelSubscriptionForm()">
+                                                                <i class="fas fa-times me-2"></i>Cancel Subscription
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>

@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}Royalty Calculator - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-calculator me-2 text-primary"></i>Royalty Calculator
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Book Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.book_type.label(class="form-label") }}
+                        {{ form.book_type(class="form-select") }}
+                        {% if form.book_type.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.book_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.interior_type.label(class="form-label") }}
+                        {{ form.interior_type(class="form-select") }}
+                        {% if form.interior_type.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.interior_type.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.marketplace.label(class="form-label") }}
+                        {{ form.marketplace(class="form-select") }}
+                        {% if form.marketplace.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.marketplace.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.trim_size.label(class="form-label") }}
+                        {{ form.trim_size(class="form-select") }}
+                        {% if form.trim_size.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.trim_size.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.page_count.label(class="form-label") }}
+                        {{ form.page_count(class="form-control", placeholder="200") }}
+                        {% if form.page_count.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.page_count.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.list_price.label(class="form-label") }}
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            {{ form.list_price(class="form-control", placeholder="9.99") }}
+                        </div>
+                        {% if form.list_price.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.list_price.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-calculator me-2"></i>Calculate Royalties
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Section -->
+{% if results %}
+<div class="royalty-results-anchor" id="royalty-results"></div>
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line me-2"></i>Royalty Calculations
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if 'error' in results %}
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>{{ results.error }}
+                    </div>
+                {% else %}
+                    <!-- Book Specifications Summary -->
+                    <div class="row g-4 mb-4">
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-book text-info" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Book Type</h6>
+                                <h5 class="text-info">{{ results.book_type }}</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-palette text-warning" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Interior Type</h6>
+                                <h5 class="text-warning">{{ results.interior_type }}</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-file-alt text-secondary" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Page Count</h6>
+                                <h5 class="text-secondary">{{ results.page_count }}</h5>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-3">
+                            <div class="metric-card p-3 text-center border rounded">
+                                <div class="metric-icon mb-2">
+                                    <i class="fas fa-dollar-sign text-primary" style="font-size: 1.5rem;"></i>
+                                </div>
+                                <h6 class="text-muted">Base Price</h6>
+                                <h5 class="text-primary">{{ results.list_price }} {{ results.base_currency }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- All Marketplaces Table -->
+                    <div class="marketplaces-table-section mb-4">
+                        <h6 class="text-secondary mb-3">
+                            <i class="fas fa-globe me-2"></i>Royalty Calculations Across All Marketplaces
+                        </h6>
+                        <div class="table-responsive">
+                            <table class="table table-hover marketplace-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Marketplace</th>
+                                        <th>List Price</th>
+                                        <th>Royalty Rate</th>
+                                        <th>Minimum List Price</th>
+                                        <th>Printing Cost</th>
+                                        <th>Estimated Royalty</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for marketplace in results.marketplace_results %}
+                                    <tr>
+                                        <td class="fw-bold">
+
+                                            {{ marketplace.marketplace }}
+                                        </td>
+                                        <td class="text-primary fw-bold">{{ marketplace.list_price_formatted }}</td>
+                                        <td class="text-success">{{ marketplace.royalty_rate }}</td>
+                                        <td class="text-info">{{ marketplace.min_price }}</td>
+                                        <td class="text-warning">{{ marketplace.printing_cost }}</td>
+                                        <td class="text-success fw-bold">{{ marketplace.estimated_royalty }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<style>
+.calc-step {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.calc-step:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    background-color: rgba(255,255,255,0.05);
+}
+
+/* Enhanced Calculation Breakdown Styles */
+.calc-breakdown-container {
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.calc-breakdown-table {
+    margin-bottom: 0;
+    background-color: transparent;
+}
+
+.calc-row {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.calc-row:hover {
+    background-color: rgba(255,255,255,0.03);
+    transform: translateX(5px);
+}
+
+.calc-row-final {
+    background: linear-gradient(135deg, rgba(40,167,69,0.1) 0%, rgba(40,167,69,0.05) 100%);
+    border: 1px solid rgba(40,167,69,0.2);
+    border-radius: 6px;
+}
+
+.calc-label {
+    padding: 0.75rem 1rem;
+    font-weight: 500;
+    color: rgba(255,255,255,0.8);
+}
+
+.calc-label-final {
+    padding: 1rem;
+    font-weight: 600;
+    color: #28a745;
+}
+
+.calc-value {
+    padding: 0.75rem 1rem;
+    font-family: 'Courier New', monospace;
+    font-weight: 500;
+}
+
+.calc-value-final {
+    padding: 1rem;
+    font-family: 'Courier New', monospace;
+}
+
+.calculation-formula {
+    background: linear-gradient(135deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.1) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.formula-display {
+    font-size: 1.1rem;
+}
+
+.formula-item {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    background-color: rgba(255,255,255,0.05);
+}
+
+.formula-operator {
+    font-size: 1.2rem;
+    color: rgba(255,255,255,0.7);
+}
+
+.formula-result {
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    background: linear-gradient(135deg, rgba(40,167,69,0.2) 0%, rgba(40,167,69,0.1) 100%);
+    border: 1px solid rgba(40,167,69,0.3);
+}
+
+.formula {
+    font-family: 'Courier New', monospace;
+    font-size: 1.1rem;
+}
+
+.metric-card {
+    transition: all 0.2s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.print-cost-card {
+    transition: all 0.2s ease;
+}
+
+.print-cost-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+/* Marketplace table styling */
+.marketplace-table {
+    margin-bottom: 0;
+    background-color: transparent;
+}
+
+.marketplace-table th {
+    border-top: none;
+    font-weight: 600;
+    color: #fff;
+    background-color: #343a40 !important;
+}
+
+.marketplace-table td {
+    vertical-align: middle;
+    border-color: rgba(255,255,255,0.1);
+}
+
+.marketplace-table tr:hover {
+    background-color: rgba(255,255,255,0.05);
+}
+
+.marketplaces-table-section {
+    background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Anchor positioning fix */
+.royalty-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+</style>
+
+<script>
+// Royalty calculator functionality with scroll to results
+document.addEventListener('DOMContentLoaded', function() {
+    {% if results %}
+        // Scroll to results if they exist
+        setTimeout(function() {
+            const resultsElement = document.getElementById('royalty-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+
+function saveCalculation() {
+    const calculationData = {
+        bookType: '{{ results.book_type if results else "" }}',
+        interiorType: '{{ results.interior_type if results else "" }}',
+        listPrice: {{ results.list_price if results else 0 }},
+        pageCount: {{ results.page_count if results else 0 }},
+        printCost: {{ results.print_cost if results else 0 }},
+        royaltyRate: '{{ results.royalty_rate if results else "" }}',
+        royaltyPerBook: {{ results.royalty_per_book if results else 0 }},
+        timestamp: new Date().toISOString()
+    };
+    
+    const dataStr = JSON.stringify(calculationData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.setAttribute('hidden', '');
+    a.setAttribute('href', url);
+    a.setAttribute('download', 'royalty_calculation.json');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    const toast = document.createElement('div');
+    toast.className = 'toast-notification';
+    toast.textContent = 'Calculation saved!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2000);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,712 @@
+{% extends "admin/base.html" %}
+
+{% block title %}User Management - Admin Dashboard{% endblock %}
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">User Management</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Users / Management</span>
+        </nav>
+    </div>
+    <div>
+        <button class="btn btn-gradient" data-bs-toggle="modal" data-bs-target="#bulkActionModal">
+            <i class="fas fa-tasks me-2"></i>Bulk Actions
+        </button>
+    </div>
+</div>
+
+<!-- Filter and Search Bar -->
+<div class="admin-card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Search Users</label>
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="search" value="{{ search }}" 
+                           placeholder="Search by name or email...">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Subscription Plan</label>
+                <select class="form-select" name="plan">
+                    <option value="">All Plans</option>
+                    <option value="free" {{ 'selected' if plan_filter == 'free' }}>Free</option>
+                    <option value="monthly" {{ 'selected' if plan_filter == 'monthly' }}>Monthly</option>
+                    <option value="yearly" {{ 'selected' if plan_filter == 'yearly' }}>Yearly</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Status</label>
+                <select class="form-select" name="status">
+                    <option value="">All Status</option>
+                    <option value="active" {{ 'selected' if status_filter == 'active' }}>Active</option>
+                    <option value="inactive" {{ 'selected' if status_filter == 'inactive' }}>Inactive</option>
+                    <option value="admin" {{ 'selected' if status_filter == 'admin' }}>Admin</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">Sort By</label>
+                <select class="form-select" name="sort">
+                    <option value="created_at" {{ 'selected' if sort_by == 'created_at' }}>Registration Date</option>
+                    <option value="email" {{ 'selected' if sort_by == 'email' }}>Email</option>
+                    <option value="subscription" {{ 'selected' if sort_by == 'subscription' }}>Subscription</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-filter me-1"></i>Filter
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Users Table -->
+<div class="admin-card">
+    <div class="card-header bg-transparent border-bottom">
+        <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                <i class="fas fa-users me-2"></i>
+                Users List ({{ users.total }} total)
+            </h5>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-success" onclick="exportUsers()">
+                    <i class="fas fa-download me-1"></i>Export
+                </button>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <ul class="dropdown-menu">
+                        <li><a class="dropdown-item" href="#" onclick="selectAllUsers()">Select All</a></li>
+                        <li><a class="dropdown-item" href="#" onclick="clearSelection()">Clear Selection</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{{ url_for('admin.analytics') }}">View Analytics</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table admin-table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th width="3%">
+                            <input type="checkbox" id="selectAll" onchange="toggleAllSelection()">
+                        </th>
+                        <th width="5%">Avatar</th>
+                        <th width="20%">User Information</th>
+                        <th width="15%">Subscription</th>
+                        <th width="12%">Status</th>
+                        <th width="15%">Registration</th>
+                        <th width="15%">Last Activity</th>
+                        <th width="15%">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users.items %}
+                    <tr class="searchable-row">
+                        <td>
+                            <input type="checkbox" class="user-checkbox" value="{{ user.id }}">
+                        </td>
+                        <td>
+                            <div class="user-avatar">
+                                {{ user.first_name[0] if user.first_name else 'U' }}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <div class="fw-bold">{{ user.first_name }} {{ user.last_name }}</div>
+                                <small class="text-muted">{{ user.email }}</small>
+                                {% if user.is_admin %}
+                                <span class="badge bg-warning mt-1" style="width: fit-content;">
+                                    <i class="fas fa-crown me-1"></i>Admin
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="badge bg-{{ 'success' if user.subscription_type == 'monthly' else 'secondary' }}">
+                                    {{ user.subscription_type.title() }}
+                                </span>
+                                {% if user.subscription_end %}
+                                <small class="text-muted mt-1">
+                                    {% if user.subscription_end > now %}
+                                        {% set days_left = (user.subscription_end - now).days %}
+                                        {{ days_left }} days left
+                                    {% else %}
+                                        Expired
+                                    {% endif %}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column">
+                                <span class="badge bg-{{ 'success' if user.is_active else 'danger' }}">
+                                    {{ 'Active' if user.is_active else 'Inactive' }}
+                                </span>
+                                {% if user.email_verified %}
+                                <small class="text-success mt-1">
+                                    <i class="fas fa-check-circle me-1"></i>Verified
+                                </small>
+                                {% else %}
+                                <small class="text-danger mt-1">
+                                    <i class="fas fa-times-circle me-1"></i>Unverified
+                                </small>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="small">
+                                {{ user.created_at.strftime('%Y-%m-%d') }}
+                            </div>
+                            <small class="text-muted">
+                                {{ user.created_at.strftime('%H:%M') }}
+                            </small>
+                        </td>
+                        <td>
+                            {% if user.last_login_at %}
+                            <div class="small">
+                                {{ user.last_login_at.strftime('%Y-%m-%d') }}
+                            </div>
+                            <small class="text-muted">
+                                {{ user.last_login_at.strftime('%H:%M') }}
+                            </small>
+                            {% else %}
+                            <span class="text-muted">Never</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                    Actions
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li>
+                                        <a class="dropdown-item" href="{{ url_for('admin.user_details', user_id=user.id) }}">
+                                            <i class="fas fa-eye me-2"></i>View Details
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="upgradeUser({{ user.id }}, '{{ user.email }}')">
+                                            <i class="fas fa-arrow-up me-2 text-success"></i>Upgrade
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="refundUser({{ user.id }}, '{{ user.email }}')">
+                                            <i class="fas fa-money-bill-wave me-2 text-warning"></i>Refund
+                                        </a>
+                                    </li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="toggleUserStatus({{ user.id }}, {{ user.is_active|lower }}, '{{ user.email }}')">
+                                            <i class="fas fa-{{ 'ban' if user.is_active else 'check' }} me-2 text-{{ 'danger' if user.is_active else 'success' }}"></i>
+                                            {{ 'Disable' if user.is_active else 'Enable' }}
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a class="dropdown-item" href="#" onclick="restrictUserTools({{ user.id }}, '{{ user.email }}')">
+                                            <i class="fas fa-lock me-2 text-danger"></i>Restrict Tools
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5 text-muted">
+                            <i class="fas fa-users fa-3x mb-3"></i>
+                            <div>No users found</div>
+                            <small>Try adjusting your search filters</small>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Pagination -->
+    {% if users.pages > 1 %}
+    <div class="card-footer bg-transparent border-top">
+        <div class="d-flex justify-content-between align-items-center">
+            <small class="text-muted">
+                Showing {{ users.per_page * (users.page - 1) + 1 }} to 
+                {{ users.per_page * users.page if users.page < users.pages else users.total }} 
+                of {{ users.total }} users
+            </small>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if users.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.users', page=users.prev_num, search=search, plan=plan_filter, status=status_filter, sort=sort_by) }}">
+                            <i class="fas fa-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in users.iter_pages() %}
+                        {% if page_num %}
+                            {% if page_num != users.page %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin.users', page=page_num, search=search, plan=plan_filter, status=status_filter, sort=sort_by) }}">
+                                    {{ page_num }}
+                                </a>
+                            </li>
+                            {% else %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                        <li class="page-item disabled">
+                            <span class="page-link">...</span>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if users.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin.users', page=users.next_num, search=search, plan=plan_filter, status=status_filter, sort=sort_by) }}">
+                            <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Bulk Action Modal -->
+<div class="modal fade" id="bulkActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Bulk Actions</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Select Action</label>
+                    <select class="form-select" id="bulkActionType">
+                        <option value="">Choose action...</option>
+                        <option value="enable">Enable Users</option>
+                        <option value="disable">Disable Users</option>
+                        <option value="upgrade">Upgrade to Premium</option>
+                        <option value="downgrade">Downgrade to Free</option>
+                        <option value="restrict">Restrict Tools</option>
+                    </select>
+                </div>
+                <div id="selectedUsersCount" class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    No users selected
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="executeBulkAction()">Execute Action</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Action Modals (Upgrade, Refund, etc.) -->
+<div class="modal fade" id="userActionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title" id="userActionTitle">User Action</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="userActionContent">
+                    <!-- Dynamic content based on action -->
+                </div>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="confirmUserAction">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleUserStatus(userId, isActive, userEmail) {
+    const action = isActive ? 'deactivate' : 'activate';
+    const confirmMessage = `Are you sure you want to ${action} user: ${userEmail}?`;
+    
+    if (confirm(confirmMessage)) {
+        fetch(`/admin/user/${userId}/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('An error occurred', 'error');
+        });
+    }
+}
+
+function upgradeUser(userId, userEmail) {
+    if (confirm(`Upgrade user ${userEmail} to premium?`)) {
+        // Implement upgrade functionality
+        showToast('Upgrade functionality will be implemented', 'info');
+    }
+}
+
+function refundUser(userId, userEmail) {
+    if (confirm(`Process refund for user ${userEmail}?`)) {
+        // Implement refund functionality
+        showToast('Refund functionality will be implemented', 'info');
+    }
+}
+
+function restrictUserTools(userId, userEmail) {
+    const tools = prompt('Enter tools to restrict (comma-separated):');
+    if (tools) {
+        showToast('Tool restriction functionality will be implemented', 'info');
+    }
+}
+
+function bulkAction(action) {
+    const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('Please select at least one user');
+        return;
+    }
+    
+    const userIds = Array.from(checkboxes).map(cb => cb.value);
+    if (confirm(`Perform ${action} on ${userIds.length} selected users?`)) {
+        showToast(`Bulk ${action} functionality will be implemented`, 'info');
+    }
+}
+
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : type === 'error' ? 'danger' : 'info'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+
+// Search and filter functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('userSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('.searchable-row');
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                row.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+    }
+    
+    // Select all functionality
+    const selectAllCheckbox = document.getElementById('selectAllUsers');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const userCheckboxes = document.querySelectorAll('.user-checkbox');
+            userCheckboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedUsers = [];
+let currentAction = null;
+let currentUserId = null;
+
+// Toggle all checkboxes
+function toggleAllSelection() {
+    const selectAll = document.getElementById('selectAll');
+    const checkboxes = document.querySelectorAll('.user-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    updateSelectedUsers();
+}
+
+// Update selected users array
+function updateSelectedUsers() {
+    selectedUsers = [];
+    const checkboxes = document.querySelectorAll('.user-checkbox:checked');
+    
+    checkboxes.forEach(checkbox => {
+        selectedUsers.push(parseInt(checkbox.value));
+    });
+    
+    // Update bulk action modal
+    const countElement = document.getElementById('selectedUsersCount');
+    if (selectedUsers.length > 0) {
+        countElement.innerHTML = `<i class="fas fa-check-circle me-2"></i>${selectedUsers.length} user(s) selected`;
+        countElement.className = 'alert alert-success';
+    } else {
+        countElement.innerHTML = `<i class="fas fa-info-circle me-2"></i>No users selected`;
+        countElement.className = 'alert alert-info';
+    }
+}
+
+// Select all users
+function selectAllUsers() {
+    document.getElementById('selectAll').checked = true;
+    toggleAllSelection();
+}
+
+// Clear selection
+function clearSelection() {
+    document.getElementById('selectAll').checked = false;
+    toggleAllSelection();
+}
+
+// Export users
+function exportUsers() {
+    const params = new URLSearchParams(window.location.search);
+    params.set('export', 'csv');
+    window.open(`{{ url_for('admin.users') }}?${params.toString()}`, '_blank');
+}
+
+// User Actions
+function upgradeUser(userId, userEmail) {
+    currentUserId = userId;
+    currentAction = 'upgrade';
+    
+    document.getElementById('userActionTitle').textContent = 'Upgrade User';
+    document.getElementById('userActionContent').innerHTML = `
+        <div class="mb-3">
+            <p>Upgrade user <strong>${userEmail}</strong> to premium?</p>
+            <div class="mb-3">
+                <label class="form-label">Plan Type</label>
+                <select class="form-select" id="planType">
+                    <option value="monthly">Monthly ($15/month)</option>
+                    <option value="yearly">Yearly ($150/year)</option>
+                </select>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('userActionModal')).show();
+}
+
+function refundUser(userId, userEmail) {
+    currentUserId = userId;
+    currentAction = 'refund';
+    
+    document.getElementById('userActionTitle').textContent = 'Process Refund';
+    document.getElementById('userActionContent').innerHTML = `
+        <div class="mb-3">
+            <p>Process refund for user <strong>${userEmail}</strong>?</p>
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                This will cancel their subscription and process a full refund.
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('userActionModal')).show();
+}
+
+function toggleUserStatus(userId, isActive, userEmail) {
+    currentUserId = userId;
+    currentAction = isActive ? 'disable' : 'enable';
+    
+    const action = isActive ? 'disable' : 'enable';
+    const actionText = isActive ? 'Disable' : 'Enable';
+    
+    document.getElementById('userActionTitle').textContent = `${actionText} User`;
+    document.getElementById('userActionContent').innerHTML = `
+        <div class="mb-3">
+            <p>${actionText} user <strong>${userEmail}</strong>?</p>
+            <div class="alert alert-${isActive ? 'warning' : 'info'}">
+                <i class="fas fa-${isActive ? 'exclamation-triangle' : 'info-circle'} me-2"></i>
+                ${isActive ? 'User will lose access to all tools and features.' : 'User will regain access to their account.'}
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('userActionModal')).show();
+}
+
+function restrictUserTools(userId, userEmail) {
+    currentUserId = userId;
+    currentAction = 'restrict';
+    
+    document.getElementById('userActionTitle').textContent = 'Restrict User Tools';
+    document.getElementById('userActionContent').innerHTML = `
+        <div class="mb-3">
+            <p>Restrict tools for user <strong>${userEmail}</strong>?</p>
+            <div class="mb-3">
+                <label class="form-label">Select Tools to Restrict</label>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="title-generator" id="tool1">
+                    <label class="form-check-label" for="tool1">Title Generator</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="subtitle-generator" id="tool2">
+                    <label class="form-check-label" for="tool2">Subtitle Generator</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="description-generator" id="tool3">
+                    <label class="form-check-label" for="tool3">Description Generator</label>
+                </div>
+                <!-- Add more tools as needed -->
+            </div>
+            <div class="mb-3">
+                <label class="form-label">Reason</label>
+                <textarea class="form-control" id="restrictionReason" placeholder="Enter reason for restriction..."></textarea>
+            </div>
+        </div>
+    `;
+    
+    new bootstrap.Modal(document.getElementById('userActionModal')).show();
+}
+
+// Execute user action
+document.getElementById('confirmUserAction').addEventListener('click', function() {
+    if (!currentUserId || !currentAction) return;
+    
+    const formData = new FormData();
+    formData.append('action', currentAction);
+    
+    if (currentAction === 'upgrade') {
+        formData.append('plan_type', document.getElementById('planType').value);
+    } else if (currentAction === 'restrict') {
+        const restrictedTools = [];
+        document.querySelectorAll('input[type="checkbox"]:checked').forEach(checkbox => {
+            restrictedTools.push(checkbox.value);
+        });
+        formData.append('restricted_tools', JSON.stringify(restrictedTools));
+        formData.append('reason', document.getElementById('restrictionReason').value);
+    }
+    
+    fetch(`/admin/user/${currentUserId}/action`, {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+    
+    bootstrap.Modal.getInstance(document.getElementById('userActionModal')).hide();
+});
+
+// Execute bulk action
+function executeBulkAction() {
+    const actionType = document.getElementById('bulkActionType').value;
+    
+    if (!actionType || selectedUsers.length === 0) {
+        alert('Please select an action and at least one user.');
+        return;
+    }
+    
+    if (!confirm(`Execute ${actionType} action for ${selectedUsers.length} user(s)?`)) {
+        return;
+    }
+    
+    fetch('/admin/users/bulk-action', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            action: actionType,
+            user_ids: selectedUsers
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+    
+    bootstrap.Modal.getInstance(document.getElementById('bulkActionModal')).hide();
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Add event listeners to checkboxes
+    document.querySelectorAll('.user-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedUsers);
+    });
+    
+    // Update selected users count
+    updateSelectedUsers();
+    
+    // Initialize search functionality
+    const searchInput = document.querySelector('input[name="search"]');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            // Debounce search
+            clearTimeout(this.searchTimeout);
+            this.searchTimeout = setTimeout(() => {
+                // Auto-submit form after 500ms of no typing
+                if (e.target.value.length >= 3 || e.target.value.length === 0) {
+                    e.target.form.submit();
+                }
+            }, 500);
+        });
+    }
+});
+</script>
+{% endblock %}

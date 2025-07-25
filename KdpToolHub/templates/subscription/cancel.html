@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Cancelled - KDP Tools{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="text-center mt-5">
+                <!-- Cancel Icon -->
+                <div class="cancel-icon mb-4">
+                    <i class="fas fa-times-circle text-warning" style="font-size: 5rem;"></i>
+                </div>
+                
+                <!-- Cancel Message -->
+                <h1 class="h2 fw-bold text-warning mb-3">Payment Cancelled</h1>
+                <p class="lead text-muted mb-4">
+                    Your payment was cancelled and no charges were made to your account.
+                </p>
+                
+                <!-- Current Status -->
+                {% if current_user.is_authenticated %}
+                    <div class="current-status p-4 bg-warning bg-opacity-10 rounded mb-4">
+                        <h5 class="text-warning mb-3">
+                            <i class="fas fa-info-circle me-2"></i>Your Current Status
+                        </h5>
+                        
+                        <div class="row text-center">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Current Plan</h6>
+                                <span class="h5 text-primary">{{ current_user.subscription_type.title() }} Plan</span>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-muted">Daily Usage</h6>
+                                <span class="h5 text-secondary">
+                                    {% if current_user.subscription_type == 'free' %}
+                                        {{ current_user.daily_usage_count }}/3 used today
+                                    {% else %}
+                                        Unlimited
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <small class="text-muted">
+                            {% if current_user.subscription_type == 'free' %}
+                                You can continue using the free plan with 3 daily tool uses.
+                            {% else %}
+                                Your current subscription remains active until the end of your billing period.
+                            {% endif %}
+                        </small>
+                    </div>
+                {% endif %}
+                
+                <!-- Why Upgrade -->
+                <div class="why-upgrade mb-4">
+                    <h5 class="mb-3">Why Upgrade to a Paid Plan?</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="benefit-item p-3 border rounded h-100">
+                                <i class="fas fa-infinity text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Unlimited Usage</h6>
+                                <small class="text-muted">Use all tools as much as you need</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="benefit-item p-3 border rounded h-100">
+                                <i class="fas fa-headset text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Priority Support</h6>
+                                <small class="text-muted">Get faster responses to your questions</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="benefit-item p-3 border rounded h-100">
+                                <i class="fas fa-chart-bar text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Advanced Analytics</h6>
+                                <small class="text-muted">Track your tool usage and results</small>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="benefit-item p-3 border rounded h-100">
+                                <i class="fas fa-download text-primary mb-2" style="font-size: 2rem;"></i>
+                                <h6>Export Features</h6>
+                                <small class="text-muted">Download your results in multiple formats</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Special Offer -->
+                <div class="special-offer p-4 bg-primary bg-opacity-10 rounded mb-4">
+                    <h5 class="text-primary mb-2">
+                        <i class="fas fa-gift me-2"></i>Limited Time Offer
+                    </h5>
+                    <p class="mb-3">Get 20% off your first month when you subscribe today!</p>
+                    <small class="text-muted">Use code: WELCOME20 at checkout</small>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="action-buttons mb-4">
+                    <a href="{{ url_for('plans') }}" class="btn btn-primary btn-lg me-3">
+                        <i class="fas fa-credit-card me-2"></i>Try Again
+                    </a>
+                    {% if current_user.is_authenticated %}
+                        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-tachometer-alt me-2"></i>Continue with Free Plan
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-user-plus me-2"></i>Create Free Account
+                        </a>
+                    {% endif %}
+                </div>
+                
+                <!-- FAQ -->
+                <div class="faq-section">
+                    <h6 class="mb-3">Common Questions</h6>
+                    
+                    <div class="accordion" id="cancelFAQ">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                    Why was my payment cancelled?
+                                </button>
+                            </h2>
+                            <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#cancelFAQ">
+                                <div class="accordion-body text-start">
+                                    <small class="text-muted">
+                                        Payments can be cancelled for various reasons including clicking the back button, 
+                                        closing the payment window, or choosing to cancel during the checkout process. 
+                                        No charges were made to your account.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                    Can I still use the free plan?
+                                </button>
+                            </h2>
+                            <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#cancelFAQ">
+                                <div class="accordion-body text-start">
+                                    <small class="text-muted">
+                                        Yes! You can continue using KDP Tools with our free plan, which includes 
+                                        3 tool uses per day and access to all 8 tools. You can upgrade anytime.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                    Is my payment information secure?
+                                </button>
+                            </h2>
+                            <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#cancelFAQ">
+                                <div class="accordion-body text-start">
+                                    <small class="text-muted">
+                                        Yes, we use Stripe for payment processing, which is a secure, PCI-compliant 
+                                        payment processor. We never store your payment information on our servers.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Support Contact -->
+                <div class="support-contact mt-4">
+                    <div class="alert alert-light">
+                        <i class="fas fa-question-circle me-2"></i>
+                        <strong>Need Help?</strong><br>
+                        <small>If you experienced an issue during checkout, please contact our support team.</small>
+                        <br>
+                        <a href="{{ url_for('contact') }}" class="btn btn-sm btn-outline-primary mt-2">
+                            <i class="fas fa-envelope me-1"></i>Contact Support
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.benefit-item {
+    transition: transform 0.2s ease;
+}
+
+.benefit-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.cancel-icon i {
+    animation: fadeInScale 1s ease-out;
+}
+
+@keyframes fadeInScale {
+    0% { 
+        opacity: 0;
+        transform: scale(0.5);
+    }
+    100% { 
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+</style>
+{% endblock %}

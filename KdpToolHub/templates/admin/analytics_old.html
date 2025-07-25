@@ -1,0 +1,345 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Analytics & Reports - Admin Panel{% endblock %}
+
+{% block admin_content %}
+<div class="analytics">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Analytics & Reports</h1>
+            <p class="text-muted">Comprehensive platform analytics and performance insights</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-info">
+                <i class="fas fa-download me-2"></i>Export Report
+            </button>
+            <div class="dropdown">
+                <button class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-calendar me-2"></i>Date Range
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#">Last 7 days</a></li>
+                    <li><a class="dropdown-item" href="#">Last 30 days</a></li>
+                    <li><a class="dropdown-item" href="#">Last 90 days</a></li>
+                    <li><a class="dropdown-item" href="#">Custom range</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Key Metrics -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-primary text-white rounded me-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Total Users</h6>
+                            <h3 class="mb-0">{{ total_users or 0 }}</h3>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+12% from last month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-success text-white rounded me-3">
+                            <i class="fas fa-crown"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Premium Users</h6>
+                            <h3 class="mb-0">{{ premium_users or 0 }}</h3>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+8% from last month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-warning text-white rounded me-3">
+                            <i class="fas fa-tools"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Tool Usage</h6>
+                            <h3 class="mb-0">{{ total_usage or 0 }}</h3>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+24% from last month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-info text-white rounded me-3">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Revenue</h6>
+                            <h3 class="mb-0">${{ revenue or 0 }}</h3>
+                            <small class="text-success">
+                                <i class="fas fa-arrow-up me-1"></i>+15% from last month
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">User Growth & Tool Usage</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center py-5">
+                        <i class="fas fa-chart-area fa-4x text-muted mb-3"></i>
+                        <h5 class="text-muted">Analytics Dashboard</h5>
+                        <p class="text-muted mb-0">Real-time charts showing user growth and tool usage trends</p>
+                        <small class="text-muted">Integration with Chart.js or similar charting library needed</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Top Tools</h5>
+                </div>
+                <div class="card-body">
+                    <div class="tool-stats">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-primary text-white rounded-circle me-2" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-heading" style="font-size: 12px;"></i>
+                                </div>
+                                <span>Title Generator</span>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">1,245</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-success text-white rounded-circle me-2" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-paragraph" style="font-size: 12px;"></i>
+                                </div>
+                                <span>Description Generator</span>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">987</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-warning text-white rounded-circle me-2" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-search" style="font-size: 12px;"></i>
+                                </div>
+                                <span>Keyword Research</span>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">756</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-info text-white rounded-circle me-2" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-user-edit" style="font-size: 12px;"></i>
+                                </div>
+                                <span>Author Generator</span>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">632</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center">
+                                <div class="icon-shape bg-secondary text-white rounded-circle me-2" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-calculator" style="font-size: 12px;"></i>
+                                </div>
+                                <span>Royalty Calculator</span>
+                            </div>
+                            <div class="text-end">
+                                <div class="fw-bold">421</div>
+                                <small class="text-muted">uses</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="row">
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Recent Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th>Tool</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if recent_activity %}
+                                    {% for activity in recent_activity %}
+                                    <tr>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <div class="user-avatar me-2" style="width: 32px; height: 32px; font-size: 12px;">
+                                                    {{ activity.user.first_name[0] if activity.user and activity.user.first_name else 'U' }}
+                                                </div>
+                                                <div>
+                                                    <div class="fw-semibold">{{ activity.user.first_name }} {{ activity.user.last_name if activity.user else 'Unknown' }}</div>
+                                                    <small class="text-muted">{{ activity.user.email if activity.user else 'Unknown' }}</small>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">{{ activity.tool_name.replace('-', ' ').title() if activity.tool_name else 'Unknown' }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="small">{{ activity.timestamp.strftime('%Y-%m-%d') if activity.timestamp else 'Unknown' }}</div>
+                                            <small class="text-muted">{{ activity.timestamp.strftime('%H:%M') if activity.timestamp else 'Unknown' }}</small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <i class="fas fa-chart-line fa-2x mb-2"></i>
+                                            <p class="mb-0">No recent activity</p>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-6 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Performance Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="performance-metrics">
+                        <div class="metric-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted">Server Response Time</span>
+                                <span class="fw-bold">247ms</span>
+                            </div>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar bg-success" style="width: 85%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted">API Success Rate</span>
+                                <span class="fw-bold">99.2%</span>
+                            </div>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar bg-success" style="width: 99%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-item mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted">User Satisfaction</span>
+                                <span class="fw-bold">4.8/5</span>
+                            </div>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar bg-warning" style="width: 96%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-item">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="text-muted">System Uptime</span>
+                                <span class="fw-bold">99.9%</span>
+                            </div>
+                            <div class="progress" style="height: 4px;">
+                                <div class="progress-bar bg-primary" style="width: 100%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.analytics .icon-shape {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.analytics .user-avatar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.analytics .progress {
+    border-radius: 10px;
+}
+
+.analytics .progress-bar {
+    border-radius: 10px;
+}
+
+.analytics .metric-item:last-child {
+    margin-bottom: 0 !important;
+}
+</style>
+{% endblock %}

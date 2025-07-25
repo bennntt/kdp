@@ -1,0 +1,53 @@
+<div class="tab-pane fade" id="subscription" role="tabpanel" style="padding: 0.5rem;" aria-labelledby="subscription-tab">
+                            <!-- Current Plan Information -->
+                            <div class="row mb-1">
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-body" style="padding: 0.75rem;">
+                                            <div class="row g-3">
+                                                <div class="col-md-4">
+                                                    <label for="subscriptionPlan" class="form-label fw-semibold">Current Plan</label>
+                                                    <input type="text" class="form-control" id="subscriptionPlan" value="Free Plan" readonly="" style="cursor: default;">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="subscriptionPrice" class="form-label fw-semibold">Price</label>
+                                                    <input type="text" class="form-control" id="subscriptionPrice" value="Free" readonly="" style="cursor: default;">
+                                                </div>
+                                                <div class="col-md-4">
+                                                    <label for="subscriptionStatus" class="form-label fw-semibold">Status</label>
+                                                    <input type="text" class="form-control" id="subscriptionStatus" value="Basic" readonly="" style="cursor: default;">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Subscription Details (Only for Paid Plans) -->
+                            
+
+                            <!-- Action Buttons -->
+                            <div class="row mt-1">
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm">
+                                        <div class="card-body" style="padding: 0.75rem;">
+                                            
+                                            <!-- Free Plan Actions -->
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <button class="btn btn-primary w-100" onclick="upgradePlan()">
+                                                        <i class="fas fa-arrow-up me-2"></i>Upgrade to Premium
+                                                    </button>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <button class="btn btn-outline-info w-100" onclick="viewPlans()">
+                                                        <i class="fas fa-eye me-2"></i>View Plans
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                                </div>

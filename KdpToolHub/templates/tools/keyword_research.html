@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+
+{% block title %}Keyword Research - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="fas fa-search me-2 text-primary"></i>Keyword Research
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+            <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-cog me-2"></i>Book Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.topic.label(class="form-label") }}
+                        {{ form.topic(class="form-control", placeholder="e.g., weight loss, cooking, photography") }}
+                        {% if form.topic.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.topic.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Enter the main topic or subject of your book
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.category.label(class="form-label") }}
+                        {{ form.category(class="form-select") }}
+                        {% if form.category.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.category.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search me-2"></i>Research Keywords
+                    </button>
+                </form>
+                
+                <div class="alert alert-info mt-4">
+                    <small>
+                        <i class="fas fa-info-circle me-1"></i>
+                        <strong>Tip:</strong> Use specific topics for better keyword suggestions. Think about what your target readers would search for.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-list me-2"></i>Keyword Research Results
+                </h5>
+                {% if results %}
+                <div class="d-flex gap-2">
+                    <button onclick="exportKeywords()" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-download me-1"></i>Export
+                    </button>
+                    <button onclick="selectAllKeywords()" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-check-double me-1"></i>Select All
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if results %}
+                    <!-- Research Summary -->
+                    <div class="research-summary mb-4">
+                        <div class="alert alert-success">
+                            <div class="row text-center">
+                                <div class="col">
+                                    <i class="fas fa-search text-primary"></i>
+                                    <div><strong>{{ results.topic }}</strong></div>
+                                    <small>Research Topic</small>
+                                </div>
+                                <div class="col">
+                                    <i class="fas fa-tags text-info"></i>
+                                    <div><strong>{{ results.category }}</strong></div>
+                                    <small>Category</small>
+                                </div>
+                                <div class="col">
+                                    <i class="fas fa-list text-warning"></i>
+                                    <div><strong>{{ results.keywords|length }}</strong></div>
+                                    <small>Keywords Found</small>
+                                </div>
+                                <div class="col">
+                                    <i class="fas fa-star text-success"></i>
+                                    <div><strong>{{ results.keywords|selectattr('difficulty', 'equalto', 'Low')|list|length }}</strong></div>
+                                    <small>Low Competition</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keyword Categories -->
+                    <div class="keyword-categories mb-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-outline-success active" onclick="filterKeywords('all')">
+                                        All Keywords
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-outline-success" onclick="filterKeywords('low')">
+                                        Low Competition
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="btn-group w-100" role="group">
+                                    <button type="button" class="btn btn-outline-info" onclick="filterKeywords('medium')">
+                                        Medium Competition
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Keywords Table -->
+                    <div class="keyword-results-anchor" id="keyword-results"></div>
+                    <div class="keywords-container">
+                        <div class="table-responsive">
+                            <table class="table table-hover keyword-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th style="width: 40px;">
+                                            <input type="checkbox" id="selectAll" class="form-check-input">
+                                        </th>
+                                        <th style="width: 300px;">
+                                            <i class="fas fa-key me-1"></i>Keyword
+                                        </th>
+                                        <th class="text-center" style="width: 100px;">
+                                            <i class="fas fa-chart-bar me-1"></i>Search Volume
+                                        </th>
+                                        <th class="text-center" style="width: 120px;">
+                                            <i class="fas fa-users me-1"></i>Competition
+                                        </th>
+                                        <th class="text-center" style="width: 100px;">
+                                            <i class="fas fa-star me-1"></i>Relevance
+                                        </th>
+                                        <th class="text-center" style="width: 80px;">
+                                            <i class="fas fa-copy me-1"></i>Action
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for keyword in results.keywords %}
+                                    <tr class="keyword-row" data-difficulty="{{ keyword.difficulty.lower() }}">
+                                        <td>
+                                            <input type="checkbox" class="keyword-checkbox form-check-input" value="{{ keyword.term }}">
+                                        </td>
+                                        <td class="keyword-term">
+                                            <strong>{{ keyword.term }}</strong>
+                                            {% if keyword.long_tail %}
+                                                <span class="badge bg-info ms-2">Long-tail</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="volume-badge volume-{{ keyword.volume.lower() }}">
+                                                {{ keyword.search_volume }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <span class="difficulty-badge difficulty-{{ keyword.difficulty.lower() }}">
+                                                <i class="fas fa-circle me-1"></i>{{ keyword.difficulty }}
+                                            </span>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="relevance-stars">
+                                                {% for i in range(5) %}
+                                                    <i class="fas fa-star{{ '' if i < keyword.relevance_score else '-empty' }} text-warning"></i>
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <button class="btn btn-sm btn-outline-secondary" 
+                                                    onclick="copyKeyword('{{ keyword.term }}', this)"
+                                                    title="Copy keyword">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Keyword Insights -->
+                    <div class="keyword-insights mt-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-success">
+                                    <div class="card-header bg-success text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-lightbulb me-2"></i>Best Opportunities
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        {% for keyword in results.keywords[:3] %}
+                                        {% if keyword.difficulty == 'Low' %}
+                                        <div class="opportunity-item mb-2">
+                                            <strong>{{ keyword.term }}</strong>
+                                            <small class="text-muted d-block">{{ keyword.search_volume }} searches • Low competition</small>
+                                        </div>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-info">
+                                    <div class="card-header bg-info text-white">
+                                        <h6 class="mb-0">
+                                            <i class="fas fa-chart-line me-2"></i>Research Tips
+                                        </h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <ul class="list-unstyled mb-0 small">
+                                            <li>• Focus on low competition keywords</li>
+                                            <li>• Use long-tail keywords for better targeting</li>
+                                            <li>• Mix high and medium volume keywords</li>
+                                            <li>• Consider seasonal trends for your topic</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-search text-muted" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 text-muted">No keyword research performed yet</h5>
+                        <p class="text-muted">Fill out the form on the left and click "Research Keywords" to get started.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<style>
+.keyword-table {
+    font-size: 0.9rem;
+}
+
+.keyword-row {
+    transition: all 0.2s ease;
+    background-color: rgba(255,255,255,0.02);
+}
+
+.keyword-row:hover {
+    background-color: rgba(255,255,255,0.05);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.keyword-term {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 500;
+}
+
+.volume-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+.volume-high {
+    background: linear-gradient(135deg, rgba(40,167,69,0.2) 0%, rgba(40,167,69,0.1) 100%);
+    border: 1px solid rgba(40,167,69,0.3);
+    color: #28a745;
+}
+
+.volume-medium {
+    background: linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(255,193,7,0.1) 100%);
+    border: 1px solid rgba(255,193,7,0.3);
+    color: #ffc107;
+}
+
+.volume-low {
+    background: linear-gradient(135deg, rgba(108,117,125,0.2) 0%, rgba(108,117,125,0.1) 100%);
+    border: 1px solid rgba(108,117,125,0.3);
+    color: #6c757d;
+}
+
+.difficulty-badge {
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.difficulty-low {
+    background: linear-gradient(135deg, rgba(40,167,69,0.2) 0%, rgba(40,167,69,0.1) 100%);
+    border: 1px solid rgba(40,167,69,0.3);
+    color: #28a745;
+}
+
+.difficulty-medium {
+    background: linear-gradient(135deg, rgba(255,193,7,0.2) 0%, rgba(255,193,7,0.1) 100%);
+    border: 1px solid rgba(255,193,7,0.3);
+    color: #ffc107;
+}
+
+.difficulty-high {
+    background: linear-gradient(135deg, rgba(220,53,69,0.2) 0%, rgba(220,53,69,0.1) 100%);
+    border: 1px solid rgba(220,53,69,0.3);
+    color: #dc3545;
+}
+
+.keywords-container {
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.research-summary .alert {
+    background: linear-gradient(135deg, rgba(40,167,69,0.1) 0%, rgba(40,167,69,0.05) 100%);
+    border: 1px solid rgba(40,167,69,0.2);
+}
+
+.relevance-stars {
+    font-size: 0.8rem;
+}
+
+.opportunity-item {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.opportunity-item:last-child {
+    border-bottom: none;
+}
+
+/* Anchor positioning fix */
+.keyword-results-anchor {
+    position: relative;
+    top: -10px;
+    visibility: hidden;
+}
+
+/* Remove any scroll behavior */
+html {
+    scroll-behavior: auto !important;
+}
+</style>
+
+<script>
+// Keyword research functionality with scroll to results
+document.addEventListener('DOMContentLoaded', function() {
+    {% if results %}
+        // Scroll to results if they exist
+        setTimeout(function() {
+            const resultsElement = document.getElementById('keyword-results');
+            if (resultsElement) {
+                resultsElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }, 100);
+    {% endif %}
+});
+
+function filterKeywords(difficulty) {
+    const rows = document.querySelectorAll('.keyword-row');
+    const buttons = document.querySelectorAll('.btn-group button');
+    
+    // Reset button states
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.classList.add('btn-outline-success', 'btn-outline-info');
+        btn.classList.remove('btn-success', 'btn-info');
+    });
+    
+    // Set active button
+    event.target.classList.add('active');
+    if (difficulty === 'medium') {
+        event.target.classList.remove('btn-outline-info');
+        event.target.classList.add('btn-info');
+    } else {
+        event.target.classList.remove('btn-outline-success');
+        event.target.classList.add('btn-success');
+    }
+    
+    // Filter rows
+    rows.forEach(row => {
+        if (difficulty === 'all') {
+            row.style.display = '';
+        } else {
+            const rowDifficulty = row.getAttribute('data-difficulty');
+            row.style.display = rowDifficulty === difficulty ? '' : 'none';
+        }
+    });
+}
+
+function copyKeyword(keyword, button) {
+    navigator.clipboard.writeText(keyword).then(function() {
+        const originalContent = button.innerHTML;
+        button.innerHTML = '<i class="fas fa-check"></i>';
+        button.classList.remove('btn-outline-secondary');
+        button.classList.add('btn-success');
+        setTimeout(() => {
+            button.innerHTML = originalContent;
+            button.classList.remove('btn-success');
+            button.classList.add('btn-outline-secondary');
+        }, 2000);
+    });
+}
+
+function selectAllKeywords() {
+    const checkboxes = document.querySelectorAll('.keyword-checkbox');
+    const selectAll = document.getElementById('selectAll');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = !allChecked;
+    });
+    selectAll.checked = !allChecked;
+}
+
+function exportKeywords() {
+    const selectedKeywords = Array.from(document.querySelectorAll('.keyword-checkbox:checked')).map(cb => cb.value);
+    
+    if (selectedKeywords.length === 0) {
+        alert('Please select at least one keyword to export.');
+        return;
+    }
+    
+    const csvContent = "Keyword\n" + selectedKeywords.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'selected_keywords.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// Select all checkbox functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const selectAllCheckbox = document.getElementById('selectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.keyword-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = this.checked;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

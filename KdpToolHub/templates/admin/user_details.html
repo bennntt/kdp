@@ -1,0 +1,345 @@
+{% extends "admin/base.html" %}
+
+{% block title %}User Details - {{ user.first_name }} {{ user.last_name }}{% endblock %}
+
+{% block admin_content %}
+<div class="user-details">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1">
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.dashboard') }}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{{ url_for('admin.users') }}">Users</a></li>
+                    <li class="breadcrumb-item active">{{ user.first_name }} {{ user.last_name }}</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-0">User Details</h1>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('admin.users') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-2"></i>Back to Users
+            </a>
+            <div class="btn-group">
+                {% if user.is_active %}
+                <button class="btn btn-warning" onclick="toggleUserStatus({{ user.id }}, 'deactivate')">
+                    <i class="fas fa-user-slash me-2"></i>Deactivate
+                </button>
+                {% else %}
+                <button class="btn btn-success" onclick="toggleUserStatus({{ user.id }}, 'activate')">
+                    <i class="fas fa-user-check me-2"></i>Activate
+                </button>
+                {% endif %}
+                <button class="btn btn-danger" onclick="deleteUser({{ user.id }}, '{{ user.email }}')">
+                    <i class="fas fa-trash me-2"></i>Delete
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Information Cards -->
+    <div class="row mb-4">
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Personal Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="user-avatar mx-auto mb-2" style="width: 80px; height: 80px; font-size: 32px;">
+                            {{ user.first_name[0] if user.first_name else 'U' }}
+                        </div>
+                        <h5 class="mb-1">{{ user.first_name }} {{ user.last_name }}</h5>
+                        <p class="text-muted mb-0">{{ user.email }}</p>
+                        {% if user.is_admin %}
+                        <span class="badge bg-warning mt-2">
+                            <i class="fas fa-crown me-1"></i>Administrator
+                        </span>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="info-list">
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">User ID</span>
+                            <span class="fw-semibold">#{{ user.id }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Status</span>
+                            <span class="badge bg-{{ 'success' if user.is_active else 'danger' }}">
+                                {{ 'Active' if user.is_active else 'Inactive' }}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Email Verified</span>
+                            <span class="badge bg-{{ 'success' if user.email_verified else 'danger' }}">
+                                {{ 'Yes' if user.email_verified else 'No' }}
+                            </span>
+                        </div>
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Joined</span>
+                            <span>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'Unknown' }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">Last Login</span>
+                            <span>{{ user.last_login_at.strftime('%Y-%m-%d %H:%M') if user.last_login_at else 'Never' }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Subscription Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <div class="subscription-badge">
+                            <span class="badge bg-{{ 'success' if user.subscription_type == 'monthly' else 'secondary' }} p-2">
+                                {{ user.subscription_type.title() if user.subscription_type else 'Free' }}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-list">
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Plan Type</span>
+                            <span class="fw-semibold">{{ user.subscription_type.title() if user.subscription_type else 'Free' }}</span>
+                        </div>
+                        {% if user.subscription_start %}
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Started</span>
+                            <span>{{ user.subscription_start.strftime('%Y-%m-%d') }}</span>
+                        </div>
+                        {% endif %}
+                        {% if user.subscription_end %}
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Expires</span>
+                            <span>{{ user.subscription_end.strftime('%Y-%m-%d') }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between py-2 border-bottom">
+                            <span class="text-muted">Daily Usage</span>
+                            <span class="fw-semibold">{{ user.daily_usage_count or 0 }}</span>
+                        </div>
+                        {% if user.stripe_customer_id %}
+                        <div class="d-flex justify-content-between py-2">
+                            <span class="text-muted">Stripe ID</span>
+                            <span class="small">{{ user.stripe_customer_id[:12] }}...</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Usage Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-3">
+                        <h4 class="text-primary">{{ tool_usage | length }}</h4>
+                        <p class="text-muted mb-0">Total Tool Uses</p>
+                    </div>
+                    
+                    {% if tool_usage %}
+                    <div class="usage-stats">
+                        {% set usage_counts = {} %}
+                        {% for usage in tool_usage %}
+                            {% if usage.tool_name in usage_counts %}
+                                {% set _ = usage_counts.update({usage.tool_name: usage_counts[usage.tool_name] + 1}) %}
+                            {% else %}
+                                {% set _ = usage_counts.update({usage.tool_name: 1}) %}
+                            {% endif %}
+                        {% endfor %}
+                        
+                        {% for tool, count in usage_counts.items() %}
+                        <div class="d-flex justify-content-between py-1">
+                            <span class="text-muted">{{ tool.replace('-', ' ').title() }}</span>
+                            <span class="fw-semibold">{{ count }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-line fa-2x mb-2"></i>
+                        <p class="mb-0">No tool usage yet</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Activity Tables -->
+    <div class="row">
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Recent Tool Usage</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Tool</th>
+                                    <th>Used At</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if tool_usage %}
+                                    {% for usage in tool_usage %}
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-primary">{{ usage.tool_name.replace('-', ' ').title() }}</span>
+                                        </td>
+                                        <td>
+                                            <div class="small">{{ usage.timestamp.strftime('%Y-%m-%d %H:%M') if usage.timestamp else 'Unknown' }}</div>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ usage.ip_address or 'Unknown' }}</small>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="3" class="text-center py-4 text-muted">
+                                            <i class="fas fa-tools fa-2x mb-2"></i>
+                                            <p class="mb-0">No tool usage recorded</p>
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Account Activity</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="activity-list">
+                        {% if activities %}
+                            {% for activity in activities %}
+                            <div class="d-flex align-items-center p-3 border-bottom">
+                                <div class="icon-shape bg-primary text-white rounded-circle me-3" style="width: 32px; height: 32px;">
+                                    <i class="fas fa-user" style="font-size: 12px;"></i>
+                                </div>
+                                <div class="flex-grow-1">
+                                    <div class="fw-semibold">{{ activity.action.replace('_', ' ').title() }}</div>
+                                    <small class="text-muted">{{ activity.timestamp.strftime('%Y-%m-%d %H:%M') if activity.timestamp else 'Unknown' }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="text-center py-4 text-muted">
+                                <i class="fas fa-history fa-2x mb-2"></i>
+                                <p class="mb-0">No activity recorded</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleUserStatus(userId, action) {
+    if (confirm(`Are you sure you want to ${action} this user?`)) {
+        fetch(`/admin/user/${userId}/${action}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('An error occurred', 'error');
+        });
+    }
+}
+
+function deleteUser(userId, userEmail) {
+    const confirmText = prompt(`Type "DELETE" to confirm deletion of user: ${userEmail}`);
+    if (confirmText === 'DELETE') {
+        fetch(`/admin/user/${userId}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message, 'success');
+                setTimeout(() => window.location.href = '/admin/users', 1500);
+            } else {
+                showToast(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('An error occurred', 'error');
+        });
+    }
+}
+
+function showToast(message, type) {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed`;
+    toast.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    toast.innerHTML = `
+        <div class="d-flex align-items-center">
+            <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-triangle'} me-2"></i>
+            ${message}
+            <button type="button" class="btn-close ms-auto" onclick="this.parentElement.parentElement.remove()"></button>
+        </div>
+    `;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.remove();
+        }
+    }, 5000);
+}
+</script>
+
+<style>
+.user-details .icon-shape {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.info-list .border-bottom:last-child {
+    border-bottom: none !important;
+}
+
+.subscription-badge {
+    margin-bottom: 1rem;
+}
+
+.activity-list .border-bottom:last-child {
+    border-bottom: none !important;
+}
+</style>
+{% endblock %}

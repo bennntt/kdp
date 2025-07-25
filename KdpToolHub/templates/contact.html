@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Contact Support - KDP Tools{% endblock %}
+
+{% block description %}Get help with KDP Tools. Contact our support team for assistance with your account, billing, tools, or any other questions.{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12 text-center mb-5 mt-4">
+            <h1 class="display-5 fw-bold">Contact Support</h1>
+            <p class="lead text-muted">We're here to help you succeed with your KDP publishing</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Contact Form -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-envelope me-2"></i>Send us a Message
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.name.label(class="form-label") }}
+                                {{ form.name(class="form-control", value=current_user.first_name + ' ' + current_user.last_name if current_user.is_authenticated else '') }}
+                                {% if form.name.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.name.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control", value=current_user.email if current_user.is_authenticated else '') }}
+                                {% if form.email.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.subject.label(class="form-label") }}
+                            {{ form.subject(class="form-control") }}
+                            {% if form.subject.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.subject.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="mb-3">
+                            {{ form.message.label(class="form-label") }}
+                            {{ form.message(class="form-control", rows="6", placeholder="Please describe your issue or question in detail...") }}
+                            {% if form.message.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in form.message.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        {% if current_user.is_authenticated %}
+                            <div class="mb-3">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    <strong>Account Information:</strong><br>
+                                    <small>
+                                        Your message will be associated with your account ({{ current_user.email }}).
+                                        Current plan: {{ current_user.subscription_type.title() }}
+                                        {% if current_user.subscription_type != 'free' %}
+                                            - You have priority support access.
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        {% endif %}
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>Send Message
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contact Information -->
+        <div class="col-lg-4">
+            <!-- Response Times -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-clock me-2"></i>Response Times
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="response-time mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge bg-success">Paid Users</span>
+                            <span class="text-success"><strong>2-4 hours</strong></span>
+                        </div>
+                        <small class="text-muted">Priority support for subscribers</small>
+                    </div>
+                    
+                    <div class="response-time">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="badge bg-secondary">Free Users</span>
+                            <span class="text-secondary"><strong>24-48 hours</strong></span>
+                        </div>
+                        <small class="text-muted">Standard support response</small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Common Topics -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-question-circle me-2"></i>Common Support Topics
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled small">
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Account and billing questions
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Tool usage and features
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Subscription management
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Technical issues
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            KDP publishing guidance
+                        </li>
+                        <li class="mb-2">
+                            <i class="fas fa-check-circle text-success me-2"></i>
+                            Feature requests
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Alternative Contact -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="card-title mb-0">
+                        <i class="fas fa-headset me-2"></i>Other Ways to Reach Us
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="contact-method mb-3">
+                        <h6 class="small text-muted">EMAIL</h6>
+                        <p class="mb-0">support@kdptools.com</p>
+                        <small class="text-muted">For general inquiries</small>
+                    </div>
+                    
+                    <div class="contact-method mb-3">
+                        <h6 class="small text-muted">BILLING</h6>
+                        <p class="mb-0">billing@kdptools.com</p>
+                        <small class="text-muted">For payment and subscription issues</small>
+                    </div>
+                    
+                    <div class="contact-method">
+                        <h6 class="small text-muted">BUSINESS HOURS</h6>
+                        <p class="mb-0">Monday - Friday</p>
+                        <small class="text-muted">9:00 AM - 6:00 PM EST</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- FAQ Section -->
+    <div class="row mt-5">
+        <div class="col-12">
+            <h3 class="text-center mb-4">Frequently Asked Questions</h3>
+            
+            <div class="accordion" id="faqAccordion">
+                <!-- Account Questions -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                            How do I upgrade my account to a paid plan?
+                        </button>
+                    </h2>
+                    <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            You can upgrade your account by visiting the <a href="{{ url_for('plans') }}">Plans page</a> 
+                            and selecting either the Monthly ($15/month) or Yearly ($150/year) plan. Click the subscribe 
+                            button and you'll be redirected to our secure Stripe checkout page.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tool Usage -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                            I've reached my daily limit on the free plan. What now?
+                        </button>
+                    </h2>
+                    <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Free accounts are limited to 3 tool uses per day. Your usage resets at midnight UTC. 
+                            To get unlimited access, consider upgrading to our paid plan which removes all daily limits.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Billing -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                            How do I cancel my subscription?
+                        </button>
+                    </h2>
+                    <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            You can cancel your subscription anytime by going to your 
+                            <a href="{{ url_for('tools.settings') }}">Account Settings</a> and clicking 
+                            "Manage Subscription". You can also use the billing portal to cancel. Your access 
+                            continues until the end of your billing period.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Tools -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                            Which tools are included in my subscription?
+                        </button>
+                    </h2>
+                    <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            All plans (including free) include access to all 8 KDP tools: Title Generator, 
+                            Subtitle Generator, Description Generator, Author Generator, Keyword Research, 
+                            Category Finder, Royalty Calculator, and Trademark Search. The difference is 
+                            in usage limits and support priority.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Technical -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                            I'm experiencing technical issues with a tool. What should I do?
+                        </button>
+                    </h2>
+                    <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            First, try refreshing the page and clearing your browser cache. If the issue persists, 
+                            please contact us using the form above with details about the specific tool, what you 
+                            were trying to do, and any error messages you received.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Refunds -->
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                            Do you offer refunds?
+                        </button>
+                    </h2>
+                    <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                        <div class="accordion-body">
+                            Yes, we offer a 30-day money-back guarantee for all paid subscriptions. 
+                            If you're not satisfied with our service, contact us within 30 days of 
+                            your subscription start date for a full refund.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- CTA Section -->
+    <div class="row mt-5 mb-5">
+        <div class="col-12 text-center">
+            <div class="cta-section p-4 bg-primary bg-opacity-10 rounded">
+                <h4 class="mb-3">Still Have Questions?</h4>
+                <p class="text-muted mb-3">
+                    Our support team is ready to help you make the most of KDP Tools
+                </p>
+                {% if not current_user.is_authenticated %}
+                    <a href="{{ url_for('auth.register') }}" class="btn btn-primary me-3">
+                        <i class="fas fa-user-plus me-2"></i>Create Free Account
+                    </a>
+                {% endif %}
+                <a href="#" onclick="document.querySelector('form').scrollIntoView();" class="btn btn-outline-primary">
+                    <i class="fas fa-envelope me-2"></i>Send Message
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

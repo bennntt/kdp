@@ -1,0 +1,598 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Analytics - Admin Dashboard{% endblock %}
+{% block page_title %}Analytics Overview{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Analytics Dashboard</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Analytics / Overview</span>
+        </nav>
+    </div>
+    <div>
+        <div class="btn-group" role="group">
+            <button type="button" class="btn btn-outline-secondary active" data-period="today">Today</button>
+            <button type="button" class="btn btn-outline-secondary" data-period="week">This Week</button>
+            <button type="button" class="btn btn-outline-secondary" data-period="month">This Month</button>
+            <button type="button" class="btn btn-outline-secondary" data-period="year">This Year</button>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics Cards -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="admin-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="metric-icon bg-primary text-white rounded-circle me-3">
+                        <i class="fas fa-users fa-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-1" id="totalUsers">{{ total_users }}</h3>
+                        <p class="text-muted mb-0">Total Users</p>
+                        <small class="text-success">
+                            <i class="fas fa-arrow-up me-1"></i>+{{ new_users_today }} today
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="admin-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="metric-icon bg-success text-white rounded-circle me-3">
+                        <i class="fas fa-chart-line fa-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-1" id="totalUsage">{{ total_usage }}</h3>
+                        <p class="text-muted mb-0">Total Tool Usage</p>
+                        <small class="text-info">
+                            <i class="fas fa-clock me-1"></i>{{ usage_today }} today
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="admin-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="metric-icon bg-warning text-white rounded-circle me-3">
+                        <i class="fas fa-crown fa-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-1" id="premiumUsers">{{ premium_users }}</h3>
+                        <p class="text-muted mb-0">Premium Users</p>
+                        <small class="text-warning">
+                            <i class="fas fa-percentage me-1"></i>{{ premium_percentage }}% conversion
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-3">
+        <div class="admin-card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="metric-icon bg-info text-white rounded-circle me-3">
+                        <i class="fas fa-dollar-sign fa-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="mb-1" id="totalRevenue">${{ total_revenue }}</h3>
+                        <p class="text-muted mb-0">Total Revenue</p>
+                        <small class="text-success">
+                            <i class="fas fa-arrow-up me-1"></i>${{ revenue_this_month }} this month
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <!-- Usage Trends Chart -->
+    <div class="col-xl-8 mb-3">
+        <div class="admin-card h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-area me-2 text-primary"></i>
+                    Usage Trends
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="usageTrendsChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Tools Chart -->
+    <div class="col-xl-4 mb-3">
+        <div class="admin-card h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tools me-2 text-success"></i>
+                    Most Used Tools
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="topToolsChart" style="height: 300px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Activity and Revenue -->
+<div class="row mb-4">
+    <!-- User Activity -->
+    <div class="col-xl-6 mb-3">
+        <div class="admin-card h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-user-clock me-2 text-info"></i>
+                    User Activity
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="userActivityChart" style="height: 250px;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Chart -->
+    <div class="col-xl-6 mb-3">
+        <div class="admin-card h-100">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-money-bill-trend-up me-2 text-success"></i>
+                    Revenue Growth
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="revenueChart" style="height: 250px;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+<!-- Detailed Tables -->
+<div class="row">
+    <!-- Top Users Table -->
+    <div class="col-xl-6 mb-3">
+        <div class="admin-card">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-trophy me-2 text-warning"></i>
+                    Top Active Users
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>User</th>
+                                <th>Usage Count</th>
+                                <th>Plan</th>
+                                <th>Join Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="topUsersTable">
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-primary rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                            <span class="text-white text-sm">JD</span>
+                                        </div>
+                                        <div>
+                                            <div class="fw-medium">John Doe</div>
+                                            <small class="text-muted">john@example.com</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="badge bg-primary">145</span></td>
+                                <td>
+                                    <span class="badge bg-success">Premium</span>
+                                </td>
+                                <td><small class="text-muted">2025-01-15</small></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-sm bg-success rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                            <span class="text-white text-sm">JS</span>
+                                        </div>
+                                        <div>
+                                            <div class="fw-medium">Jane Smith</div>
+                                            <small class="text-muted">jane@example.com</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td><span class="badge bg-primary">98</span></td>
+                                <td>
+                                    <span class="badge bg-secondary">Free</span>
+                                </td>
+                                <td><small class="text-muted">2025-02-01</small></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Table -->
+    <div class="col-xl-6 mb-3">
+        <div class="admin-card">
+            <div class="card-header bg-transparent border-bottom">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2 text-info"></i>
+                    Recent Activity
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Tool</th>
+                                <th>User</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentActivityTable">
+                            <tr>
+                                <td>
+                                    <span class="badge bg-outline-primary">
+                                        Title Generator
+                                    </span>
+                                </td>
+                                <td>
+                                    <small>John Doe</small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">14:35</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">Success</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <span class="badge bg-outline-success">
+                                        Description Generator
+                                    </span>
+                                </td>
+                                <td>
+                                    <small>Jane Smith</small>
+                                </td>
+                                <td>
+                                    <small class="text-muted">14:28</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">Success</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.metric-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-sm {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.btn-group .btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .metric-icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// Chart configurations
+const chartColors = {
+    primary: '#667eea',
+    success: '#28a745',
+    info: '#17a2b8',
+    warning: '#ffc107',
+    danger: '#dc3545',
+    secondary: '#6c757d'
+};
+
+// Usage Trends Chart
+const usageTrendsCtx = document.getElementById('usageTrendsChart').getContext('2d');
+const usageTrendsChart = new Chart(usageTrendsCtx, {
+    type: 'line',
+    data: {
+        labels: {{ usage_trends_labels | tojson }},
+        datasets: [{
+            label: 'Total Usage',
+            data: {{ usage_trends_data | tojson }},
+            borderColor: chartColors.primary,
+            backgroundColor: chartColors.primary + '20',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)'
+                }
+            },
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)'
+                }
+            }
+        }
+    }
+});
+
+// Top Tools Chart
+const topToolsCtx = document.getElementById('topToolsChart').getContext('2d');
+const topToolsChart = new Chart(topToolsCtx, {
+    type: 'doughnut',
+    data: {
+        labels: {{ top_tools_labels | tojson }},
+        datasets: [{
+            data: {{ top_tools_data | tojson }},
+            backgroundColor: [
+                chartColors.primary,
+                chartColors.success,
+                chartColors.info,
+                chartColors.warning,
+                chartColors.danger
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    padding: 20,
+                    usePointStyle: true
+                }
+            }
+        }
+    }
+});
+
+// User Activity Chart
+const userActivityCtx = document.getElementById('userActivityChart').getContext('2d');
+const userActivityChart = new Chart(userActivityCtx, {
+    type: 'bar',
+    data: {
+        labels: {{ activity_labels | tojson }},
+        datasets: [{
+            label: 'Active Users',
+            data: {{ activity_data | tojson }},
+            backgroundColor: chartColors.info + '80',
+            borderColor: chartColors.info,
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)'
+                }
+            },
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)'
+                }
+            }
+        }
+    }
+});
+
+// Revenue Chart
+const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+const revenueChart = new Chart(revenueCtx, {
+    type: 'line',
+    data: {
+        labels: {{ revenue_labels | tojson }},
+        datasets: [{
+            label: 'Revenue',
+            data: {{ revenue_data | tojson }},
+            borderColor: chartColors.success,
+            backgroundColor: chartColors.success + '20',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    callback: function(value) {
+                        return '$' + value;
+                    }
+                }
+            },
+            x: {
+                grid: {
+                    color: 'rgba(255, 255, 255, 0.1)'
+                },
+                ticks: {
+                    color: 'rgba(255, 255, 255, 0.7)'
+                }
+            }
+        }
+    }
+});
+
+// Period Filter
+document.querySelectorAll('[data-period]').forEach(button => {
+    button.addEventListener('click', function() {
+        // Update active state
+        document.querySelectorAll('[data-period]').forEach(btn => btn.classList.remove('active'));
+        this.classList.add('active');
+        
+        // Load data for selected period
+        loadAnalyticsData(this.dataset.period);
+    });
+});
+
+async function loadAnalyticsData(period) {
+    try {
+        const response = await fetch(`/admin/analytics/data?period=${period}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update metrics
+            document.getElementById('totalUsers').textContent = data.total_users;
+            document.getElementById('totalUsage').textContent = data.total_usage;
+            document.getElementById('premiumUsers').textContent = data.premium_users;
+            document.getElementById('totalRevenue').textContent = '$' + data.total_revenue;
+            
+            // Update charts
+            updateCharts(data);
+        }
+    } catch (error) {
+        console.error('Error loading analytics data:', error);
+    }
+}
+
+function updateCharts(data) {
+    // Update usage trends chart
+    if (data.usage_trends_labels && data.usage_trends_data) {
+        usageTrendsChart.data.labels = data.usage_trends_labels;
+        usageTrendsChart.data.datasets[0].data = data.usage_trends_data;
+        usageTrendsChart.update();
+    }
+    
+    // Update top tools chart
+    if (data.top_tools_labels && data.top_tools_data) {
+        topToolsChart.data.labels = data.top_tools_labels;
+        topToolsChart.data.datasets[0].data = data.top_tools_data;
+        topToolsChart.update();
+    }
+    
+    // Update user activity chart
+    if (data.activity_labels && data.activity_data) {
+        userActivityChart.data.labels = data.activity_labels;
+        userActivityChart.data.datasets[0].data = data.activity_data;
+        userActivityChart.update();
+    }
+    
+    // Update revenue chart
+    if (data.revenue_labels && data.revenue_data) {
+        revenueChart.data.labels = data.revenue_labels;
+        revenueChart.data.datasets[0].data = data.revenue_data;
+        revenueChart.update();
+    }
+}
+
+// Auto refresh every 5 minutes
+setInterval(() => {
+    const activePeriod = document.querySelector('[data-period].active').dataset.period;
+    loadAnalyticsData(activePeriod);
+}, 300000);
+</script>
+{% endblock %}

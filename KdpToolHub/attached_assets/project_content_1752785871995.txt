@@ -1,0 +1,4771 @@
+=== File: config.py ===
+import os
+from datetime import timedelta
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-here'
+    SQLALCHEMY_DATABASE_URI = 'mysql+pymysql://root:@localhost/Kdpcheck'
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
+    STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+    STRIPE_PUBLIC_KEY = os.getenv("STRIPE_PUBLIC_KEY")
+    STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    TOGETHER_API_KEY = '6929d5ee4cee4cd1f29be388ed24ec4708e558176d0f3e3ed5dfae4dbe78527a'
+    QWEN_API_KEY = os.getenv("QWEN_API_KEY")# ← من هنا تضع مفتاح Mistral 7B
+
+
+
+==================================================
+
+=== File: main.py ===
+from app import create_app
+
+app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True)
+==================================================
+
+=== File: app\extension.py ===
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+
+db = SQLAlchemy()
+login_manager = LoginManager()
+==================================================
+
+=== File: app\models.py ===
+from app.extension import db
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+import jwt
+import stripe
+from time import time
+from flask import current_app, flash
+from config import Config
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), unique=True)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def generate_verification_token(self):
+        import secrets
+        self.verification_token = secrets.token_urlsafe(50)
+        return self.verification_token
+
+    def verify_email(self):
+        self.email_verified = True
+        self.verification_token = None
+        db.session.commit()
+
+    def get_reset_token(self, expires_in=600):
+        return jwt.encode(
+            {'reset_password': self.id, 'exp': time() + expires_in},
+            current_app.config['SECRET_KEY'],
+            algorithm='HS256'
+        )
+
+    @staticmethod
+    def verify_reset_token(token):
+        try:
+            id = jwt.decode(
+                token,
+                current_app.config['SECRET_KEY'],
+                algorithms=['HS256']
+            )['reset_password']
+        except Exception as e:
+            current_app.logger.error(f"Token verification failed: {e}")
+            return None
+        return User.query.get(id)
+
+
+class Plan(db.Model):
+    __tablename__ = 'plans'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50), nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    duration_days = db.Column(db.Integer, nullable=False)
+    features = db.Column(db.JSON)
+    is_popular = db.Column(db.Boolean, default=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    stripe_payment_link = db.Column(db.String(255))
+
+    @staticmethod
+    def get_free_plan():
+        return Plan.query.filter_by(name="Free").first()
+
+
+class UserPlan(db.Model):
+    __tablename__ = 'user_plans'
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    plan_id = db.Column(db.Integer, db.ForeignKey('plans.id'), nullable=False)
+    start_date = db.Column(db.DateTime, default=db.func.current_timestamp())
+    end_date = db.Column(db.DateTime)
+    stripe_subscription_id = db.Column(db.String(50), nullable=True)
+
+    plan = db.relationship('Plan', backref='user_plans', lazy=True)
+
+    @staticmethod
+    def get_active_plan(user_id):
+        return UserPlan.query.filter_by(user_id=user_id).first()
+
+    @staticmethod
+    def subscribe_user_to_plan(user_id, plan_id, stripe_subscription_id=None):
+        user_plan = UserPlan.get_active_plan(user_id)
+
+        if user_plan:
+            # تحديث الاشتراك الحالي
+            user_plan.plan_id = plan_id
+            user_plan.start_date = db.func.current_timestamp()
+            user_plan.end_date = db.func.current_timestamp() + db.text(f"INTERVAL 30 DAY")
+
+            if stripe_subscription_id:
+                user_plan.stripe_subscription_id = stripe_subscription_id  # ✅ حفظ الـ subscription ID
+
+        else:
+            # إنشاء اشتراك جديد للمستخدم لأول مرة
+            user_plan = UserPlan(
+                user_id=user_id,
+                plan_id=plan_id,
+                start_date=db.func.current_timestamp(),
+                end_date=db.func.current_timestamp() + db.text(f"INTERVAL 30 DAY"),
+                stripe_subscription_id=stripe_subscription_id  # ✅ حفظ الـ subscription ID عند الإنشاء
+            )
+            db.session.add(user_plan)
+
+        # ✅ تأكد من تنفيذ `flush()` قبل `commit()`
+        db.session.flush()
+        db.session.commit()
+
+
+    @staticmethod
+    def cancel_user_plan(user_id):
+        user_plan = UserPlan.get_active_plan(user_id)
+        if user_plan:
+            stripe.api_key = Config.STRIPE_SECRET_KEY
+            try:
+                stripe.Subscription.delete(user_plan.stripe_subscription_id)
+            except stripe.error.StripeError as e:
+                print(f"Stripe error: {e}")
+
+            free_plan = Plan.get_free_plan()
+            if free_plan:
+                UserPlan.subscribe_user_to_plan(user_id, free_plan.id)
+
+        return True
+
+    @staticmethod
+    def refund_plan(user_id):
+        user_plan = UserPlan.get_active_plan(user_id)
+
+        if not user_plan or not user_plan.stripe_subscription_id:
+            print("❌ لا يوجد اشتراك نشط أو معرف اشتراك.")
+            return False
+
+        stripe.api_key = Config.STRIPE_SECRET_KEY
+
+        try:
+            # 1. الحصول على آخر فاتورة مرتبطة بالاشتراك
+            invoices = stripe.Invoice.list(subscription=user_plan.stripe_subscription_id, limit=1)
+
+            if not invoices.data:
+                print("❌ لم يتم العثور على فواتير مرتبطة بهذا الاشتراك.")
+                flash("❌ لم يتم العثور على فواتير مرتبطة بهذا الاشتراك.", "danger")
+                return False
+
+            latest_invoice = invoices.data[0]
+
+            # 2. التأكد من أن الفاتورة تحتوي على charge
+            if not hasattr(latest_invoice, 'charge') or not latest_invoice.charge:
+                print("❌ لا توجد عملية دفع مرتبطة بهذه الفاتورة.")
+                flash("❌ لا توجد عملية دفع مرتبطة بهذه الفاتورة.", "danger")
+                return False
+
+            # 3. إنشاء طلب استرداد الأموال
+            refund = stripe.Refund.create(
+                charge=latest_invoice.charge,
+                reason='requested_by_customer'
+            )
+            print(f"💸 تم إنشاء استرداد بنجاح: {refund.id}")
+            flash("💸 تم تقديم طلب استرداد الأموال.", "info")
+
+            # 4. تعطيل التجديد التلقائي فقط (بدون حذف الاشتراك نهائيًا)
+            stripe.Subscription.modify(
+                user_plan.stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+
+            # 5. تحديث قاعدة البيانات
+            user_plan.auto_renew = False
+            db.session.commit()
+
+            # 6. إعادة المستخدم إلى الخطة المجانية (اختياري)
+            free_plan = Plan.get_free_plan()
+            if free_plan:
+                UserPlan.subscribe_user_to_plan(user_id, free_plan.id)
+
+        except stripe.error.StripeError as e:
+            print(f"❌ خطأ في Stripe: {e}")
+            db.session.rollback()
+            flash(f"❌ خطأ في Stripe: {e.user_message or str(e)}", "danger")
+            return False
+
+        except Exception as e:
+            print(f"❌ حدث خطأ غير متوقع: {e}")
+            db.session.rollback()
+            flash(f"❌ حدث خطأ غير متوقع: {str(e)}", "danger")
+            return False
+
+        return True
+==================================================
+
+=== File: app\__init__.py ===
+import stripe
+from flask import Flask
+from config import Config
+from app.extension import db
+from flask_login import LoginManager
+from app.models import Plan
+
+login_manager = LoginManager()
+
+def create_app(config_class=Config):
+    app = Flask(__name__, static_folder='static')
+    app.config.from_object(config_class)
+
+    # ✅ تعيين مفاتيح Stripe داخل سياق التطبيق
+    with app.app_context():
+        stripe.api_key = app.config['STRIPE_SECRET_KEY']
+
+    # ربط الامتدادات
+    db.init_app(app)
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
+    login_manager.login_message = 'Please log in to access this page.'
+
+    # ✅ تعريف `user_loader` خارج `app_context()`
+    @login_manager.user_loader
+    def load_user(user_id):
+        from app.models import User
+        return User.query.get(int(user_id))
+
+    # ✅ إنشاء الجداول داخل سياق التطبيق
+    with app.app_context():
+        #db.drop_all()
+        db.create_all()  # 🔹 تأكد من أن الجداول قد تم إنشاؤها
+
+        # ✅ التحقق من وجود خطط الاشتراك وإضافتها إن لم تكن موجودة
+        if Plan.query.count() == 0:
+            plans = [
+                Plan(
+                    name="Free",
+                    price=0,
+                    duration_days=30,
+                    features=["5 searches per day", "Basic analytics", "Email support"],
+                    is_popular=False,
+                    stripe_payment_link="https://buy.stripe.com/test_00w4gz0stgXtaf9b8c4Ni01"
+                ),
+                Plan(
+                    name="Pro",
+                    price=9.99,
+                    duration_days=30,
+                    features=["100 searches per day", "Advanced analytics", "Priority support", "API access"],
+                    is_popular=True,
+                    stripe_payment_link="https://buy.stripe.com/test_8x23cv4IJ5eLevpb8c4Ni02"
+                )
+            ]
+            db.session.bulk_save_objects(plans)
+            db.session.commit()
+
+    # تسجيل الـ Blueprints
+    from app.routes.research import bp as research_bp
+    from app.routes.generator_tools import bp as generator_bp
+    from app.routes.auth import bp as auth_bp
+    from app.routes.email import bp as email_bp
+    from app.routes.account import bp as account_bp
+    from app.routes.home import bp as home_bp
+    from app.routes.plans import bp as plans_bp
+    from app.routes.stripe.webhook import bp as webhook_bp
+    from app.routes.stripe import bp as stripe_bp
+    from app.routes.planning_tools import bp as royalty_calculator_bp
+
+
+
+    app.register_blueprint(home_bp)
+    app.register_blueprint(research_bp)
+    app.register_blueprint(generator_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(email_bp)
+    app.register_blueprint(account_bp)
+    app.register_blueprint(plans_bp)
+    app.register_blueprint(stripe_bp)
+    app.register_blueprint(webhook_bp)
+    app.register_blueprint(royalty_calculator_bp)
+
+    # إذا كنت تستخدم user_management
+    try:
+        from app.user_management import bp as user_mgmt_bp
+        app.register_blueprint(user_mgmt_bp)
+    except ImportError:
+        pass
+
+    return app
+
+==================================================
+
+=== File: app\forms\title_generator_form.py ===
+from flask_wtf import FlaskForm
+from wtforms import StringField, SelectField, TextAreaField
+from wtforms.validators import DataRequired, Length, Optional
+
+class TitleGeneratorForm(FlaskForm):
+    book_name = StringField(
+        'Book Name',
+        validators=[
+            DataRequired(message="Book Name is required"),
+            Length(max=100, message="Book Name cannot exceed 100 characters")
+        ]
+    )
+
+    book_type = SelectField(
+        'Book Type',
+        choices=[
+            ('fiction', 'Fiction'),
+            ('non_fiction', 'Non-Fiction'),
+            ('children', "Children's Books"),
+            ('self_help', 'Self-Help'),
+            ('educational', 'Educational'),
+            ('cookbooks', 'Cookbooks'),
+            ('journals_planners', 'Journals & Planners'),
+            ('poetry', 'Poetry'),
+            ('biography_memoirs', 'Biography & Memoirs'),
+            ('fantasy', 'Fantasy'),
+            ('horror', 'Horror'),
+            ('mystery_thriller', 'Mystery & Thriller'),
+            ('romance', 'Romance'),
+            ('science_fiction', 'Science Fiction'),
+            ('historical_fiction', 'Historical Fiction'),
+            ('graphic_novels_comics', 'Graphic Novels & Comics'),
+            ('business_money', 'Business & Money'),
+            ('health_wellness', 'Health & Wellness'),
+            ('religion_spirituality', 'Religion & Spirituality'),
+            ('travel', 'Travel'),
+            ('sports_outdoors', 'Sports & Outdoors')
+        ],
+        validators=[DataRequired(message="Book Type is required")]
+    )
+    book_lang = SelectField(
+        'Book Lang',
+        choices=[
+            ('en', 'English'),
+            ('fr', 'French'),
+            ('es', "Spanish"),
+            ('ar', 'Arabic'),
+            ('de', 'German')
+        ],
+        validators=[DataRequired(message="Book Lang is required")]
+    )
+
+    keywords = TextAreaField(
+        'Keywords',
+        validators=[
+            Optional(),
+            Length(max=255, message="Keywords cannot exceed 255 characters")
+        ]
+    )
+==================================================
+
+=== File: app\routes\account\account.py ===
+from flask import Blueprint, render_template
+from flask_login import current_user, login_required
+from app.models import UserPlan, Plan
+
+bp = Blueprint('account', __name__, url_prefix='/account')
+
+@bp.route('/')
+@login_required
+def account():
+    user_data = {
+        'email': current_user.email,
+        'first_name': current_user.first_name,
+        'last_name': current_user.last_name,
+        'joined_date': current_user.created_at.strftime('%B %d, %Y'),
+        'verified': current_user.email_verified
+    }
+
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    if user_plan:
+        plan = Plan.query.get(user_plan.plan_id)
+        user_data['plan'] = {
+            'name': plan.name,
+            'expires': user_plan.end_date.strftime('%Y-%m-%d'),
+        }
+
+    return render_template('account/account.html', active_section='Account', user=user_data)
+
+
+@bp.route('/edit', methods=['GET', 'POST'])
+@login_required
+def edit_account():
+    return render_template('account/edit_account.html', active_section='Account')
+
+==================================================
+
+=== File: app\routes\account\__init__.py ===
+# app/routes/account/__init__.py
+from .account import bp  # مباشر بدون إعادة تسمية
+
+bp = bp  # يمكنك إعادة استخدام الاسم نفسه
+==================================================
+
+=== File: app\routes\auth\forms.py ===
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField, BooleanField
+from wtforms.validators import DataRequired, Email, EqualTo, Length
+
+class RegistrationForm(FlaskForm):
+    first_name = StringField('First Name', validators=[DataRequired(), Length(max=50)])
+    last_name = StringField('Last Name', validators=[DataRequired(), Length(max=50)])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Register')
+
+class LoginForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    submit = SubmitField('Login')
+==================================================
+
+=== File: app\routes\auth\login.py ===
+from flask import render_template, redirect, url_for, flash, request, session
+from flask_login import login_user, current_user
+from app.routes.auth import bp
+from app.models import User
+
+@bp.route('/login', methods=['GET', 'POST'])
+def login():
+    if current_user.is_authenticated:
+        return redirect(url_for('home.home'))
+
+    from wtforms import StringField, PasswordField, SubmitField
+    from wtforms.validators import DataRequired, Email
+    from flask_wtf import FlaskForm
+
+    class LoginForm(FlaskForm):
+        email = StringField('Email', validators=[DataRequired(), Email()])
+        password = PasswordField('Password', validators=[DataRequired()])
+        submit = SubmitField('Login')
+
+    form = LoginForm()
+
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+
+        if user and user.check_password(form.password.data):
+            if not user.email_verified:
+                return redirect(url_for('auth.login'))
+            login_user(user, remember=False)
+            session.permanent = True
+            return redirect(url_for('generator.title_generator'))
+
+
+    return render_template('auth/login.html', form=form)
+
+==================================================
+
+=== File: app\routes\auth\logout.py ===
+from flask import redirect, url_for, session
+from flask_login import logout_user
+from app.routes.auth import bp
+
+@bp.route('/logout')
+def logout():
+    logout_user()
+    session.clear()
+    return redirect(url_for('home.home'))
+
+==================================================
+
+=== File: app\routes\auth\models.py ===
+from app.extension import db
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
+
+class User(UserMixin, db.Model):
+    __tablename__ = 'users'
+    __table_args__ = {'extend_existing': True}
+
+    id = db.Column(db.Integer, primary_key=True)
+    first_name = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), unique=True)
+    created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        return check_password_hash(self.password_hash, password)
+
+    def generate_verification_token(self):
+        import secrets
+        self.verification_token = secrets.token_urlsafe(50)
+        return self.verification_token
+
+    def verify_email(self):
+        self.email_verified = True
+        self.verification_token = None
+        db.session.commit()
+
+
+==================================================
+
+=== File: app\routes\auth\register.py ===
+from flask import render_template, redirect, url_for, flash
+from flask_login import current_user
+
+from app.routes.auth import bp
+from app.models import User, Plan, UserPlan
+from app.extension import db
+from app.routes.email.email import send_verification_email
+
+@bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('home.home'))
+
+    from flask_wtf import FlaskForm
+    from wtforms import StringField, PasswordField, SubmitField
+    from wtforms.validators import DataRequired, Email, EqualTo
+
+    class RegistrationForm(FlaskForm):
+        first_name = StringField('First Name', validators=[DataRequired()])
+        last_name = StringField('Last Name', validators=[DataRequired()])
+        email = StringField('Email', validators=[DataRequired(), Email()])
+        password = PasswordField('Password', validators=[DataRequired()])
+        confirm_password = PasswordField('Confirm Password', validators=[
+            DataRequired(),
+            EqualTo('password', message='Passwords must match')
+        ])
+        submit = SubmitField('Register')
+
+    form = RegistrationForm()
+
+    if form.validate_on_submit():
+        if User.query.filter_by(email=form.email.data).first():
+            flash("This email is already registered.", "danger")
+            return redirect(url_for('auth.register'))
+
+        # ✅ إصلاح: إنشاء المستخدم الجديد داخل التحقق الصحيح
+        new_user = User(
+            first_name=form.first_name.data,
+            last_name=form.last_name.data,
+            email=form.email.data
+        )
+        new_user.set_password(form.password.data)
+        db.session.add(new_user)
+        db.session.commit()
+
+        # ✅ بعد إنشاء المستخدم مباشرة: إضافة خطة Free مؤقتًا
+        free_plan = Plan.get_free_plan()
+        if free_plan:
+            from app.models import UserPlan  # تأكد من الاستيراد
+            UserPlan.subscribe_user_to_plan(new_user.id, free_plan.id)
+
+    # ✅ إرسال بريد التحقق
+        send_verification_email(new_user)
+
+        flash("Account created successfully! Please check your email for verification.", "success")
+        return redirect(url_for('email.check_email'))
+
+    # ✅ إصلاح: التحقق من خطأ كلمة المرور يجب أن يكون داخل `validate_on_submit`
+    if form.is_submitted() and form.confirm_password.errors:
+        flash("Passwords do not match. Please try again.", "danger")
+
+    return render_template('auth/register.html', form=form)
+
+==================================================
+
+=== File: app\routes\auth\reset_password.py ===
+from flask import render_template, request, redirect, url_for, flash
+from flask_login import current_user
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Email, Length, EqualTo
+from app.routes.auth import bp
+from app.models import User
+from app.extension import db
+from app.routes.email.email import send_password_reset_email, send_password_change_confirmation
+
+
+class ResetPasswordRequestForm(FlaskForm):
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    submit = SubmitField('Request Password Reset')
+
+class ResetPasswordForm(FlaskForm):
+    password = PasswordField('New Password', validators=[DataRequired(), Length(min=8)])
+    confirm_password = PasswordField('Confirm Password',
+                                     validators=[DataRequired(), EqualTo('password')])
+    submit = SubmitField('Reset Password')
+
+@bp.route('/reset-password', methods=['GET', 'POST'])
+def reset_password_request():
+    if current_user.is_authenticated:
+        return redirect(url_for('home.home'))
+
+    form = ResetPasswordRequestForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            send_password_reset_email(user)
+        flash('If your email is registered, you will receive a password reset link.', 'info')
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/reset_password_request.html', form=form)
+
+@bp.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    if current_user.is_authenticated:
+        return redirect(url_for('home.home'))
+
+    user = User.verify_reset_token(token)
+    if not user:
+        flash('Invalid or expired token', 'danger')
+        return redirect(url_for('auth.reset_password_request'))
+
+    form = ResetPasswordForm()
+    if form.validate_on_submit():
+        user.set_password(form.password.data)
+        db.session.commit()
+
+        # Send confirmation email
+        send_password_change_confirmation(user)
+        flash('Your password has been reset. You can now log in.', 'success')
+        return redirect(url_for('auth.login'))
+
+    return render_template('auth/reset_password.html', form=form)
+==================================================
+
+=== File: app\routes\auth\__init__.py ===
+from flask import Blueprint
+
+bp = Blueprint('auth', __name__)
+
+from . import login, register, reset_password, logout
+
+==================================================
+
+=== File: app\routes\email\check_email.py ===
+from flask import render_template, redirect, url_for, Blueprint
+
+from app.routes.email import bp
+
+
+@bp.route('/check-email')
+def check_email():
+    return render_template('email/check_email.html')
+==================================================
+
+=== File: app\routes\email\email.py ===
+from flask import redirect, url_for, flash, current_app, Blueprint
+from app.models import User
+from app.extension import db
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+
+from app.routes.email import bp
+
+
+@bp.route('/verify-email/<token>', methods=['GET', 'POST'])
+def verify_email(token):
+    user = User.query.filter_by(verification_token=token).first()
+    if user:
+        user.email_verified = True
+        user.verification_token = None
+        user.verify_email()
+        flash("Your email has been verified. You can now log in.")
+    else:
+        flash("Invalid or expired token.")
+    return redirect(url_for('auth.login'))
+def send_verification_email(user):
+    token = secrets.token_urlsafe(50)
+    user.verification_token = token
+    db.session.commit()
+
+    verification_link = f"http://127.0.0.1:5000/verify-email/{token}"
+    msg = MIMEText(f"Please click the following link to verify your email: {verification_link}")
+    msg['Subject'] = "Verify Your Email"
+    msg['From'] = "no-reply@example.com"
+    msg['To'] = user.email
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login("aminebentiss00@gmail.com", "yimh fzry tvax jzho")
+            server.sendmail("no-reply@example.com", user.email, msg.as_string())
+    except Exception as e:
+        current_app.logger.error(f"Failed to send email: {e}")
+
+
+def send_password_reset_email(user):
+    token = user.get_reset_token()
+    reset_link = f"http://127.0.0.1:5000/reset-password/{token}"
+
+    msg = MIMEText(f"""To reset your password, visit the following link:
+{reset_link}
+
+If you did not make this request, please ignore this email.
+""")
+
+    msg['Subject'] = 'KdpCheck - Password Reset Request'
+    msg['From'] = "no-reply@example.com"
+    msg['To'] = user.email
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login("aminebentiss00@gmail.com", "yimh fzry tvax jzho")
+            server.sendmail("no-reply@example.com", user.email, msg.as_string())
+    except Exception as e:
+        current_app.logger.error(f"Failed to send password reset email: {e}")
+
+def send_password_change_confirmation(user):
+    msg = MIMEText(f"""Hello {user.first_name},
+
+This is a confirmation that the password for your KdpCheck account ({user.email}) was recently changed.
+
+If you didn't make this change, please contact our support team immediately at support@Kdpcheck.com.
+
+For your security, we recommend:
+- Using a strong, unique password
+- Enabling two-factor authentication if available
+- Not sharing your password with anyone
+
+Thanks,
+The KdpCheck Team
+""")
+
+    msg['Subject'] = 'Your KdpCheck Password Was Changed'
+    msg['From'] = "no-reply@Kdpcheck.com"
+    msg['To'] = user.email
+
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login("aminebentiss00@gmail.com", "yimh fzry tvax jzho")
+            server.sendmail("no-reply@Kdpcheck.com", user.email, msg.as_string())
+    except Exception as e:
+        current_app.logger.error(f"Failed to send password change confirmation: {e}")
+==================================================
+
+=== File: app\routes\email\__init__.py ===
+from flask import Blueprint
+
+bp = Blueprint('email', __name__)
+
+from . import check_email, email
+==================================================
+
+=== File: app\routes\generator\generator.py ===
+# app/routes/generator/generator.py
+import requests
+import time
+import re
+
+from faker import Faker
+import random
+
+LANG_COUNTRY_MAP = {
+    "English (US)": "en_US",
+    "English (UK)": "en_GB",
+    "French (France)": "fr_FR",
+    "German (Germany)": "de_DE",
+    "Spanish (Spain)": "es_ES",
+}
+
+PREFIXES = {
+    "en_US": ['Dr.', 'Mr.', 'Mrs.', 'Ms.', 'Prof.', 'Rev.', 'Sir', 'Lady'],
+    "en_GB": ['Dr', 'Mr', 'Mrs', 'Ms', 'Prof', 'Rev', 'Sir', 'Lady'],
+    "fr_FR": ['M.', 'Mme', 'Dr', 'Prof', 'Mlle'],
+    "de_DE": ['Herr', 'Frau', 'Dr.', 'Prof.'],
+    "es_ES": ['Sr.', 'Sra.', 'Dr.', 'Prof.'],
+}
+
+SUFFIXES = {
+    "en_US": ['Jr.', 'Sr.', 'II', 'III', 'PhD', 'MD', 'Esq.'],
+    "en_GB": ['Jr', 'Sr', 'II', 'III', 'PhD', 'MD'],
+    "fr_FR": ['Jr', 'Sr', 'II', 'III'],
+    "de_DE": ['Jr', 'Sr', 'II', 'III'],
+    "es_ES": ['Jr', 'Sr', 'II', 'III'],
+}
+
+GROQ_API_KEY = "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"
+HEADERS = {
+    "Authorization": f"Bearer {GROQ_API_KEY}",
+    "Content-Type": "application/json"
+}
+
+FORBIDDEN_WORDS = {"free", "bestseller", "gift", "notebook", "ebook", "download"}
+FORBIDDEN_SYMBOLS_TITLE = set('"\' :;\\/|<>*?=+{}[]()#@&%')
+FORBIDDEN_SYMBOLS_SUBTITLE = set('"\' ;\\/|<>*?=+{}[]()#@&%')
+
+
+def ai(prompt, retries=3, delay=2):
+    data = {
+        "model": "llama3-8b-8192",
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    for attempt in range(retries):
+        try:
+            response = requests.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers=HEADERS,
+                json=data,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"].strip()
+        except requests.exceptions.RequestException:
+            if attempt < retries - 1:
+                time.sleep(delay)
+            else:
+                print("❌ فشل الاتصال بعد عدة محاولات.")
+    return None
+
+
+def is_valid_text(text, max_length, forbidden_words, forbidden_symbols, min_length=1, check_space=True,
+                  banned_starts=()):
+    if len(text) > max_length or len(text) < min_length:
+        return False
+    text_lower = text.lower()
+    for word in forbidden_words:
+        if word in text_lower:
+            return False
+    for ch in forbidden_symbols:
+        if ch != ' ' and ch in text:
+            return False
+    if check_space and ' ' not in text:
+        return False
+    for start in banned_starts:
+        if text_lower.startswith(start):
+            return False
+    if "'" in text or '"' in text:
+        return False
+    return True
+
+
+def _generate_title_once(book_name, book_type, book_lang, keywords=None, user_title=None):
+    if user_title:
+        cleaned = user_title.strip()
+        valid = is_valid_text(
+            cleaned, 100, FORBIDDEN_WORDS, FORBIDDEN_SYMBOLS_TITLE,
+            min_length=3, check_space=True,
+            banned_starts=("here is", "this is", "title", "example", "optimized")
+        )
+        if valid:
+            return cleaned
+
+    prompt = f"""
+You are an AI trained for generating ONLY valid and compliant Amazon KDP book titles.
+You are a professional KDP product description writer. 
+📘 Book Details:
+- Book Name: "{book_name}"
+- Book Type: "{book_type}"
+- Language: "{book_lang}"
+- Keywords: "{keywords or 'general'}"
+❌ DO NOT start with:
+- "Here is"
+- "This is"
+- "Sure"
+- "Generated description"
+- Any quotes, punctuation, or labels
+🎯 Output Requirements (STRICT):
+- Output ONLY a single valid book title.
+- Do NOT include explanations, greetings, or formatting like "Title:".
+- Do NOT use quotation marks, colons, or any punctuation.
+- Do NOT add any introductory sentence like "Here is..." or "Sure!"
+- The result MUST be a natural, catchy, SEO-friendly book title.
+- If no keywords are provided, infer them from book name, type, and language.
+- Title MUST be under 100 characters.
+- MUST comply with Amazon KDP title rules:
+  - NO misleading, keyword stuffing, or promotional words.
+  - NO forbidden terms: "free", "bestseller", "notebook", "gift", etc.
+  - NO ALL-CAPS or weird casing.
+
+📌 Final Output:
+Return only the clean and final title. Nothing else.
+"""
+    raw_response = ai(prompt)
+    raw_response = re.sub(r'^(here i.*?:\s*)', '', raw_response.strip(), flags=re.I)
+    if not raw_response:
+        return None
+    cleaned = raw_response.strip()
+    if cleaned.lower().startswith("title:"):
+        cleaned = cleaned[6:].strip()
+    cleaned = cleaned.strip('"\' :')
+
+    valid = is_valid_text(
+        cleaned, 100, FORBIDDEN_WORDS, FORBIDDEN_SYMBOLS_TITLE,
+        min_length=3, check_space=True,
+        banned_starts=("here is", "this is", "title", "example", "optimized")
+    )
+    if valid:
+        return cleaned
+    return None
+
+
+def generate_title(book_name, book_type, book_lang, keywords=None, user_title=None, retries=3):
+    for _ in range(retries):
+        title = _generate_title_once(book_name, book_type, book_lang, keywords, user_title)
+        if title is not None:
+            return title
+    return None
+
+
+def _generate_subtitle_once(book_name, book_type, book_lang, title_text="", keywords=None):
+    max_total = 200
+    title_length = len(title_text.strip())
+    subtitle_limit = max_total - title_length
+    if subtitle_limit <= 0:
+        print("❌ لا توجد مساحة للعناوين الفرعية.")
+        return None
+
+    prompt = f"""
+    You are a professional KDP product subtitle writer. Generate a detailed, persuasive, and SEO-optimized book subtitle
+
+⚠️ STRICT RULES: 
+- Return ONLY the subtitle line, with NO introductions, greetings, or explanations.
+- NO punctuation marks, quotes, colons, semicolons, line breaks, or formatting.
+- Subtitle length MUST be between {max(subtitle_limit - 5, 30)} and {subtitle_limit} characters.
+- NO forbidden words: free, bestseller, gift, notebook, ebook, download.
+- Subtitle must be grammatically correct, natural, smooth, SEO-friendly, and complement the main title.
+- NO keyword stuffing, spammy content, all caps, or weird casing.
+- Output EXACTLY one clean subtitle line ONLY.
+
+You are an AI specialized in generating high-quality, compliant Amazon KDP subtitles.
+
+📘 Book Information:
+- Book Name: "{book_name}"
+- Book Type: "{book_type}"
+- Book Language: "{book_lang}"
+- Keywords: "{keywords or 'general'}"
+- Main Title: "{title_text}" (Length: {title_length} characters)
+
+🧠 Objective:
+Generate one subtitle that:
+- Complements the main title.
+- Uses as much of the allowed subtitle character limit as possible: exactly {subtitle_limit} characters or within ±5 characters.
+- Enhances discoverability and SEO.
+- Is grammatically correct and reads smoothly.
+❌ DO NOT start with:
+- "Here is"
+- "This is"
+- "Sure"
+- "Generated description"
+- Any quotes, punctuation, or labels
+🚫 Strict Rules:
+- DO NOT include any of the following:
+  - Intro phrases like "Subtitle:" or "Here is".
+  - Quotation marks, punctuation marks (e.g., :, ;, ", ', etc.).
+  - Line breaks, bullet points, or explanations.
+- NO spammy, promotional, misleading, or keyword-stuffed content.
+- MUST NOT contain forbidden words: "free", "bestseller", "gift", "notebook", "ebook", "download", etc.
+- MUST NOT exceed {subtitle_limit} characters.
+- MUST follow Amazon KDP content guidelines.
+
+✅ Output Format:
+Return only the clean and final title. Nothing else.
+Return ONLY the clean subtitle — one line only — with no extra text, quotes, or formatting.
+The line must be complete and should not be cut off mid-sentence.
+""".strip()
+
+    raw_response = ai(prompt)
+    raw_response = re.sub(r'^(here i.*?:\s*)', '', raw_response.strip(), flags=re.I)
+    if not raw_response:
+        return None
+    cleaned = raw_response.strip().split('\n')[0]
+    cleaned = re.sub(r"^(subtitle:)", "", cleaned, flags=re.I).strip()
+    cleaned = cleaned.strip('"\' :')
+
+    valid = is_valid_text(
+        cleaned, subtitle_limit, FORBIDDEN_WORDS, FORBIDDEN_SYMBOLS_SUBTITLE,
+        min_length=30, check_space=False,
+        banned_starts=("here is", "this is", "subtitle", "example", "optimized")
+    )
+
+    if valid:
+        return cleaned
+
+    return None
+
+
+def generate_subtitle(book_name, book_type, book_lang, title_text="", keywords=None, retries=3):
+    for _ in range(retries):
+        subtitle = _generate_subtitle_once(book_name, book_type, book_lang, title_text, keywords)
+        if subtitle is not None:
+            return subtitle
+    return None
+
+
+def generate_author_name(language="English (US)", country="United States", gender=None,
+                         include_prefix=False, include_middle_name=False, include_suffix=False):
+    locale = LANG_COUNTRY_MAP.get(language, "en_US")
+    fake = Faker(locale)
+
+    prefix = random.choice(PREFIXES.get(locale, [])) if include_prefix else ''
+    suffix = random.choice(SUFFIXES.get(locale, [])) if include_suffix else ''
+
+    if gender == 'male':
+        first_name = fake.first_name_male()
+    elif gender == 'female':
+        first_name = fake.first_name_female()
+    else:
+        first_name = fake.first_name()
+
+    middle_name = fake.first_name() if include_middle_name else ''
+    last_name = fake.last_name()
+
+    return {
+        "Prefix": prefix,
+        "First Name": first_name,
+        "Middle Name": middle_name,
+        "Last Name": last_name,
+        "Suffix": suffix
+    }
+
+
+def _generate_description_once(product, binding_type, interior_type, page_count, interior_trim_size, keywords, language, length_level=3):
+    language_map = {
+        "en": "English",
+        "fr": "French",
+        "es": "Spanish",
+        "de": "German",
+        "ar": "Arabic"
+    }
+    language_label = language_map.get(language, "English")
+
+    prompt = f"""
+You are a professional KDP product description writer. Generate a detailed, persuasive, and SEO-optimized book description formatted exactly in HTML using only the allowed KDP styles:
+Follow these strict rules:
+- Format all paragraphs using <p> tags.
+- Use <b> for section headings and product title.
+- Use <i> only for emphasis.
+- Use <ul><li> for lists, including Key Features.
+- At the end, include the following Key Features in a bullet list with <li> and bold keys:
+
+- Use <p> for paragraphs.
+- Use <b> for bold text.
+- Use <i> for italic text.
+- Use <ul> and <li> for bulleted lists.
+- Use heading tags <h4>, <h5>, <h6> if needed.
+- Separate paragraphs with a blank line.
+- The first paragraph must have the product name in bold and a strong benefit statement.
+- Include multiple paragraphs describing the book, its uses, and benefits.
+- Add a bullet list of key features with:
+    - Binding Type: {binding_type}
+    - Interior Type: {interior_type}
+    - Page Count: {page_count}
+    - Trim Size: {interior_trim_size}
+- End with a warm, encouraging closing paragraph.
+- No banned words (free, bestseller, gift, download, ebook, etc.) per KDP rules.
+- Use natural, fluent {language_label}.
+
+Input variables:
+- product name: {product}
+- keywords: {keywords}
+❌ DO NOT start with:
+- "Here is"
+- "This is"
+- "Sure"
+- "Generated description"
+- Any quotes, punctuation, or labels
+❌ DO NOT use <div>, <span>, or any class or inline styles.
+
+Output only the full HTML snippet.
+
+
+""".strip()
+
+    raw_response = ai(prompt)
+    raw_response = re.sub(r'^(here i.*?:\s*)', '', raw_response.strip(), flags=re.I).replace("*","")
+
+    return raw_response.strip() if raw_response else None
+
+
+def generate_description(product,binding_type,interior_type,page_count,interior_trim_size, keywords, language, length_level=3, retries=3):
+    for _ in range(retries):
+        desc = _generate_description_once(product,binding_type,interior_type,page_count,interior_trim_size, keywords, language, length_level)
+        if desc:
+            return desc
+    return None
+
+
+
+
+if __name__ == "__main__":
+    description = generate_description(
+        product="Alphabet Tracing Worksheets for Kids A-Z",
+        binding_type="Paperback",
+        interior_type="Black & White Interior with White Paper",
+        page_count="120",
+        interior_trim_size="8.5 x 11 in",
+        keywords="pdf png eps svg, stencil silhouette, vector vinyl, geometric background, square pattern svg, argyle pattern svg, diamond pattern, tumbler template, checkered pattern, argyle diamond print, argyle cut file, argyle cricut file, argyle stencil",
+        language="en",
+        length_level=3
+    )
+    print(description)
+
+==================================================
+
+=== File: app\routes\generator_tools\author_name_generator.py ===
+#app/routes/generator_tools/author_name_generator.py
+from flask import render_template, request
+from flask_login import login_required, current_user
+
+from app.routes.generator.generator import generate_author_name
+from app.routes.generator_tools import bp
+from app.models import Plan, UserPlan
+
+
+@bp.route('/author-name-generator', methods=['GET', 'POST'])
+@login_required
+def author_name_generator():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    full_name = None  # ← هذا السطر ضروري
+
+    if request.method == 'POST':
+        gender = request.form.get('gender', 'male')
+    country = request.form.get('country', 'US')
+    selected_fields = [field.lower().replace(' ', '_') for field in request.form.getlist('fields')]
+
+    valid_genders = ['male', 'female']
+    valid_countries = ['US', 'FR', 'ES', 'DE']
+    lang_map = {
+        'US': 'en-US',
+        'FR': 'fr-FR',
+        'ES': 'es-ES',
+        'DE': 'de-DE'
+    }
+
+    if gender not in valid_genders:
+        full_name = {'Error': 'Invalid gender'}
+    elif country not in lang_map:
+        full_name = {'Error': 'Invalid country'}
+    else:
+        language = lang_map[country]
+        full_name = generate_author_name(
+            language=language,
+            country=country,
+            gender=gender,
+            include_prefix='prefix' in selected_fields,
+            include_middle_name='middle_name' in selected_fields,
+            include_suffix='suffix' in selected_fields
+        )
+
+
+
+    return render_template(
+            'generator_tools/author_name_generator.html',
+            active_section='Author Name',
+            plans=available_plans,
+            user_plan=user_plan,
+            current_plan=current_plan,
+            free_plan=free_plan,
+            full_name=full_name  # ← الآن لن يعطيك خطأ في GET
+        )
+
+==================================================
+
+=== File: app\routes\generator_tools\description_generator.py ===
+# app/routes/generator_tools/description_generator.py
+from flask import render_template, request
+from flask_login import login_required, current_user
+from app.routes.generator_tools import bp
+from app.models import Plan, UserPlan
+from app.routes.generator.generator import generate_description
+
+@bp.route('/description-generator', methods=['GET', 'POST'])
+@login_required
+def description_generator():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    generated_description = None
+
+    if request.method == 'POST':
+        product = request.form.get('product', '').strip()
+    keywords = request.form.get('keywords', '').strip()
+    language = request.form.get('language', '').strip()
+    length_level = int(request.form.get('description_length', 3))
+
+    binding_type = request.form.get('binding_type', '').strip()
+    interior_type = request.form.get('interior_type', '').strip()
+    page_count = request.form.get('page_count', '').strip()
+    interior_trim_size = request.form.get('interior_trim_size', '').strip()
+
+    # ✅ تحقق أساسي
+    if not product or len(product) > 100:
+        generated_description = "<p><b>Error:</b> Invalid product name.</p>"
+    elif language not in ['en', 'fr', 'es', 'de', 'ar']:
+        generated_description = "<p><b>Error:</b> Invalid language selected.</p>"
+    elif not page_count.isdigit() or int(page_count) <= 0:
+        generated_description = "<p><b>Error:</b> Page count must be a positive number.</p>"
+    else:
+        # ✅ استدعاء التوليد
+        generated_description = generate_description(
+            product=product,
+            binding_type=binding_type,
+            interior_type=interior_type,
+            page_count=page_count,
+            interior_trim_size=interior_trim_size,
+            keywords=keywords,
+            language=language,
+            length_level=length_level
+        )
+
+
+    return render_template(
+        'generator_tools/description_generator.html',
+        active_section='Description Generator',
+        plans=available_plans,
+        user_plan=user_plan,
+        current_plan=current_plan,
+        free_plan=free_plan,
+        generated_description=generated_description
+    )
+
+==================================================
+
+=== File: app\routes\generator_tools\subtitle_generator.py ===
+from flask import render_template, request
+from flask_login import login_required, current_user
+from app.routes.generator_tools import bp
+from app.models import Plan, UserPlan
+from app.routes.generator.generator import  generate_subtitle
+
+
+@bp.route('/subtitle-generator', methods=['GET', 'POST'])
+@login_required
+def subtitle_generator():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    generated_subtitle = None
+
+    if request.method == 'POST':
+        book_name = request.form.get('book_name', '').strip()
+    book_type = request.form.get('book_type', '').strip()
+    language = request.form.get('language', '').strip()
+    keywords = request.form.get('keywords', '').strip()
+
+    if not book_name or len(book_name) < 2:
+        generated_subtitle = "Invalid book name."
+    elif language not in ['en', 'fr', 'es', 'de', 'ar']:
+        generated_subtitle = "Invalid language selected."
+    else:
+        generated_subtitle = generate_subtitle(book_name, book_type, language, keywords)
+
+
+    return render_template('generator_tools/subtitle_generator.html',
+                           active_section='Subtitle Generator',
+                           plans=available_plans,
+                           user_plan=user_plan,
+                           current_plan=current_plan,
+                           free_plan=free_plan,
+                           generated_subtitle=generated_subtitle)
+==================================================
+
+=== File: app\routes\generator_tools\title_generator.py ===
+# app/routes/generator_tools/title_generator.py
+
+from flask import render_template, request
+from flask_login import login_required, current_user
+from app.routes.generator_tools import bp
+from app.models import Plan, UserPlan
+from app.forms.title_generator_form import TitleGeneratorForm
+# استيراد الوسيط
+from app.routes.generator.generator import generate_title
+
+@bp.route('/title-generator', methods=['GET', 'POST'])
+@login_required
+def title_generator():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    form = TitleGeneratorForm(request.form or None)
+    generated_title = None
+
+    if request.method == 'POST':
+        book_name = form.book_name.data.strip()
+        book_type = form.book_type.data.strip()
+        book_lang = (form.book_lang.data or "").strip()
+        keywords = form.keywords.data.strip() if form.keywords.data else ''
+
+        # 👇 استخدام الوسيط لتوليد العنوان
+        ai_title = generate_title(book_name, book_type,book_lang, keywords)
+
+
+
+                # بعد استدعاء ai_title
+        if ai_title:
+            # تنظيف النتيجة وإبقاء أول جزأين فقط (اسم الكتاب + كلمة واحدة اختيارية)
+            cleaned_title = ai_title.strip()
+
+            if cleaned_title.lower().startswith("title:"):
+                cleaned_title = cleaned_title[6:].strip()
+
+            cleaned_title = cleaned_title.strip('"').strip("'")
+
+            # تقسيم الكلمات وتحديد أول جزأين فقط
+            words = cleaned_title.split()
+            #generated_title = ' '.join(words[:2])  # مثل: "Cozy Friends Coloring"
+            generated_title = cleaned_title  # عرض العنوان كامل كما هو من أول نتيجة
+
+        else:
+            generated_title = None
+
+
+    return render_template(
+        'generator_tools/title_generator.html',
+        active_section='Title Generator',
+        plans=available_plans,
+        user_plan=user_plan,
+        current_plan=current_plan,
+        free_plan=free_plan,
+        generated_title=generated_title,
+        form=form
+    )
+==================================================
+
+=== File: app\routes\generator_tools\__init__.py ===
+from flask import Blueprint
+
+bp = Blueprint('generator', __name__, url_prefix='/')
+
+from . import title_generator, subtitle_generator, description_generator, author_name_generator
+==================================================
+
+=== File: app\routes\home\home.py ===
+from flask import Blueprint, render_template
+
+bp = Blueprint('home', __name__, template_folder='templates/home')
+
+@bp.route('/')
+def home():
+    return render_template('home/home.html')
+@bp.route('/home')
+def home_redirect():
+    return render_template('home/home.html')
+
+==================================================
+
+=== File: app\routes\home\__init__.py ===
+from .home import bp
+
+__all__ = ['bp']
+==================================================
+
+=== File: app\routes\planning_tools\royalty_calculator.py ===
+from app.routes.planning_tools import bp
+from flask import Blueprint, render_template, request
+from flask_login import login_required
+import requests
+
+CURRENCY_SYMBOLS = {
+    'USD': '$', 'GBP': '£', 'EUR': '€', 'PLN': 'zł',
+    'SEK': 'kr', 'JPY': '¥', 'CAD': '$', 'AUD': '$'
+}
+
+PRINTING_COSTS = {
+    'paperback': {
+        'black_white': {'base': 0.85, 'per_page': 0.010},
+        'standard_color': {'base': 3.65, 'per_page': 0.07},
+        'premium_color': {'base': 3.99, 'per_page': 0.09}
+    },
+    'hardcover': {
+        'black_white': {'base': 3.59, 'per_page': 0.012},
+        'standard_color': {'base': 5.65, 'per_page': 0.10},
+        'premium_color': {'base': 6.00, 'per_page': 0.12}
+    }
+}
+
+MARKETPLACES = {
+    'Amazon.com':     {'currency': 'USD', 'threshold': 9.99},
+    'Amazon.co.uk':   {'currency': 'GBP', 'threshold': 7.99},
+    'Amazon.de':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.fr':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.es':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.it':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.nl':      {'currency': 'EUR', 'threshold': 9.99},
+    'Amazon.pl':      {'currency': 'PLN', 'threshold': 40.0},
+    'Amazon.se':      {'currency': 'SEK', 'threshold': 99.0},
+    'Amazon.co.jp':   {'currency': 'JPY', 'threshold': 1000},
+    'Amazon.ca':      {'currency': 'CAD', 'threshold': 13.99},
+    'Amazon.com.au':  {'currency': 'AUD', 'threshold': 13.99},
+}
+
+@bp.route('/royalty-calculator', methods=['GET', 'POST'])
+@login_required
+def royalty_calculator():
+    results = []
+    list_price = 0.0
+    page_count = 0
+    error_message = None
+
+    # القيم الافتراضية
+    selected_marketplace = 'Amazon.com'
+    selected_book_type = 'paperback'
+    selected_interior_type = 'black_white'
+    selected_trim_size = '5x8'
+    base_currency = MARKETPLACES[selected_marketplace]['currency']
+
+    if request.method == 'POST':
+        try:
+            list_price = float(request.form.get('list_price', 0))
+            page_count = int(request.form.get('page_count', 0))
+            selected_marketplace = request.form.get('marketplace', 'Amazon.com')
+            selected_book_type = request.form.get('book_type', 'paperback')
+            selected_interior_type = request.form.get('interior_type', 'black_white')
+            selected_trim_size = request.form.get('trim_size', '5x8')
+            base_currency = MARKETPLACES[selected_marketplace]['currency']
+        except ValueError:
+            pass
+
+        # جلب أسعار الصرف
+        fx_url = f"https://api.frankfurter.app/latest?from={base_currency}"
+        try:
+            fx_data = requests.get(fx_url).json().get('rates', {})
+            fx_data[base_currency] = 1.0
+        except Exception:
+            fx_data = {base_currency: 1.0}
+
+        # حساب تكلفة الطباعة للسوق المحدد للتحقق من الحد الأدنى
+        cost = PRINTING_COSTS[selected_book_type][selected_interior_type]
+        printing_cost_selected = round(cost['base'] + (page_count * cost['per_page']), 2)
+        royalty_rate_selected = 0.60 if list_price >= MARKETPLACES[selected_marketplace]['threshold'] else 0.50
+        min_required_price = round(printing_cost_selected / royalty_rate_selected, 2)
+
+        if list_price < min_required_price:
+            error_message = f"The list price for {selected_marketplace} must be at least {min_required_price:.2f} {base_currency} to cover printing costs."
+
+        ordered_marketplaces = [selected_marketplace] + [m for m in MARKETPLACES if m != selected_marketplace]
+
+        if not error_message:
+            for market in ordered_marketplaces:
+                data = MARKETPLACES[market]
+                currency = data['currency']
+                symbol = CURRENCY_SYMBOLS.get(currency, '')
+                rate = fx_data.get(currency, 1.0)
+
+                printing_cost = round(cost['base'] + (page_count * cost['per_page']), 2)
+                converted_price = round(list_price * rate, 2)
+                royalty_rate = 0.60 if converted_price >= data['threshold'] else 0.50
+                estimated_royalty = round((converted_price * royalty_rate) - printing_cost, 2)
+                min_list_price = round(printing_cost / royalty_rate, 2)
+
+                results.append({
+                    'marketplace': market,
+                    'currency': currency,
+                    'list_price': f"{symbol} {converted_price:.2f}",
+                    'royalty_rate': f"{int(royalty_rate * 100)}%",
+                    'min_price': f"{symbol} {min_list_price:.2f}",
+                    'printing_cost': f"{symbol} {printing_cost:.2f}",
+                    'estimated_royalty': f"{symbol} {estimated_royalty:.2f}"
+                })
+
+    return render_template(
+        'planning_tools/royalty_calculator.html',
+        active_section='Royalty Calculator',
+        royalty_table=results,
+        input_list_price=list_price,
+        input_page_count=page_count,
+        selected_marketplace=selected_marketplace,
+        selected_book_type=selected_book_type,
+        selected_interior_type=selected_interior_type,
+        selected_trim_size=selected_trim_size,
+        error_message=error_message
+    )
+
+==================================================
+
+=== File: app\routes\planning_tools\__init__.py ===
+from flask import Blueprint
+bp = Blueprint('planning_tools', __name__, url_prefix='/')
+from . import royalty_calculator
+
+==================================================
+
+=== File: app\routes\plans\plans.py ===
+from flask import Blueprint, render_template, redirect, url_for, flash, request, current_app
+from flask_login import login_required, current_user
+from app.models import Plan, UserPlan
+import stripe
+bp = Blueprint('plans', __name__, url_prefix='/plans')
+from app.models import Plan, UserPlan, db
+
+@bp.route('/')
+@login_required
+def plans():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    return render_template('plans/plans.html',
+                           active_section='Plans',
+                           plans=available_plans,
+                           user_plan=user_plan,
+                           current_plan=current_plan,
+                           free_plan=free_plan)
+
+
+@bp.route('/subscribe/<int:plan_id>', methods=['POST'])
+@login_required
+def subscribe(plan_id):
+    plan = Plan.query.get_or_404(plan_id)
+    UserPlan.subscribe_user_to_plan(current_user.id, plan_id)
+
+    flash(f"Successfully subscribed to {plan.name}!", "success")
+    return redirect(url_for('plans.plans'))
+
+@bp.route('/cancel-plan', methods=['POST'])
+@login_required
+def cancel_plan():
+    UserPlan.cancel_user_plan(current_user.id)
+    flash("Your subscription has been canceled.", "info")
+    return redirect(url_for('plans.plans'))
+
+@bp.route('/refund-plan', methods=['POST'])
+@login_required
+def refund_plan():
+    UserPlan.refund_plan(current_user.id)
+    flash("Your subscription has been canceled.", "info")
+    return redirect(url_for('plans.plans'))
+
+
+@bp.route('/refundplan', methods=['POST'])
+@login_required
+def refundplan():
+    user_plan = UserPlan.get_active_plan(current_user.id)
+
+    if not user_plan or not user_plan.stripe_subscription_id:
+        flash("⚠️ لا يوجد اشتراك نشط.", "warning")
+        return redirect(url_for('plans.plans'))
+
+    try:
+        stripe.api_key = current_app.config['STRIPE_SECRET_KEY']
+
+        # الحصول على آخر فاتورة مرتبطة بالاشتراك
+        invoices = stripe.Invoice.list(subscription=user_plan.stripe_subscription_id, limit=1)
+        if not invoices.data:
+            flash("⚠️ لم يتم العثور على فواتير للاشتراك.", "danger")
+            return redirect(url_for('plans.plans'))
+
+        latest_invoice = invoices.data[0]
+
+
+        # 🔄 تعطيل التجديد التلقائي
+        stripe.Subscription.modify(
+            charge=latest_invoice.charge,
+            reason='requested_by_customer'
+        )
+
+        # 🗂️ تحديث قاعدة البيانات
+        user_plan.auto_renew = False
+        db.session.commit()
+
+        flash("💸 تم طلب استرداد الأموال بنجاح!", "info")
+
+    except stripe.error.StripeError as e:
+        db.session.rollback()
+        error_msg = e.user_message or str(e)
+        flash(f"❌ خطأ في Stripe: {error_msg}", "danger")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"❌ حدث خطأ غير متوقع: {str(e)}", "danger")
+
+    return redirect(url_for('plans.plans'))
+==================================================
+
+=== File: app\routes\plans\__init__.py ===
+from .plans import bp as plans_bp  # نستخدم اسمًا مختلفًا لتجنب التعارض
+bp = plans_bp  # إعادة تعريف bp لتتوافق مع باقي الهيكل
+==================================================
+
+=== File: app\routes\research\category_finder.py ===
+from flask import render_template, request, url_for
+from flask_login import login_required, current_user
+from app.routes.research import bp
+import json
+import os
+
+@bp.route('/category-finder', methods=['GET'])
+@login_required
+def category_finder():
+    search_query = request.args.get("q", "").strip().lower()
+    page = int(request.args.get("page", 1))
+    per_page = 15
+    categories = []
+    total_found = 0
+
+    json_path = os.path.join(os.getcwd(), "categories.json")
+
+    if search_query and os.path.exists(json_path):
+        with open(json_path, "r", encoding="utf-8") as f:
+            all_categories = json.load(f)
+
+        filtered = [
+            cat for cat in all_categories
+            if search_query in cat['name'].lower() or search_query in cat['Category Path'].lower()
+        ]
+        total_found = len(filtered)
+
+        # Pagination logic
+        start = (page - 1) * per_page
+        end = start + per_page
+        categories = filtered[start:end]
+
+    return render_template(
+        'research/category_finder.html',
+        active_section='Category Finder',
+        categories=categories,
+        search_query=search_query,
+        page=page,
+        per_page=per_page,
+        total_found=total_found
+    )
+
+==================================================
+
+=== File: app\routes\research\keyword_research.py ===
+from flask import render_template, request
+from flask_login import login_required, current_user
+from app.models import Plan, UserPlan
+from app.routes.research import bp
+
+@bp.route('/keyword-research', methods=['GET', 'POST'])
+@login_required
+def keyword_research():
+    available_plans = Plan.query.filter_by(is_active=True).all()
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    current_plan = Plan.query.get(user_plan.plan_id) if user_plan else None
+    free_plan = Plan.get_free_plan()
+
+    keyword = ''
+    results = None
+
+    sample_data = [
+        {"keyword": "coloring book", "search_volume": "Medium", "competing_books": "1,256", "books_broadly_related": "1,454", "competing_authors": "304", "median_monthly_sales": "$223"},
+        {"keyword": "coloring book for adults", "search_volume": "Low", "competing_books": "327", "books_broadly_related": "370", "competing_authors": "221", "median_monthly_sales": "$36,913"},
+        {"keyword": "adult coloring book", "search_volume": "Medium", "competing_books": "146", "books_broadly_related": "219", "competing_authors": "161", "median_monthly_sales": "$4,250"},
+        {"keyword": "kids coloring pages", "search_volume": "High", "competing_books": "890", "books_broadly_related": "1,002", "competing_authors": "198", "median_monthly_sales": "$1,200"},
+        {"keyword": "mandala coloring book", "search_volume": "Medium", "competing_books": "678", "books_broadly_related": "789", "competing_authors": "156", "median_monthly_sales": "$950"},
+        {"keyword": "nature coloring book", "search_volume": "High", "competing_books": "1,123", "books_broadly_related": "1,300", "competing_authors": "289", "median_monthly_sales": "$1,100"},
+        {"keyword": "animal coloring book", "search_volume": "High", "competing_books": "987", "books_broadly_related": "1,111", "competing_authors": "245", "median_monthly_sales": "$900"},
+        {"keyword": "educational coloring book", "search_volume": "Medium", "competing_books": "564", "books_broadly_related": "632", "competing_authors": "132", "median_monthly_sales": "$750"},
+        {"keyword": "coloring book for stress relief", "search_volume": "Medium", "competing_books": "450", "books_broadly_related": "512", "competing_authors": "110", "median_monthly_sales": "$680"},
+        {"keyword": "easy coloring book", "search_volume": "Low", "competing_books": "320", "books_broadly_related": "380", "competing_authors": "95", "median_monthly_sales": "$450"},
+        {"keyword": "flower coloring book", "search_volume": "High", "competing_books": "1,001", "books_broadly_related": "1,200", "competing_authors": "267", "median_monthly_sales": "$1,050"},
+        {"keyword": "art therapy coloring book", "search_volume": "Medium", "competing_books": "398", "books_broadly_related": "456", "competing_authors": "102", "median_monthly_sales": "$600"},
+        {"keyword": "fantasy coloring book", "search_volume": "Medium", "competing_books": "489", "books_broadly_related": "555", "competing_authors": "123", "median_monthly_sales": "$800"},
+        {"keyword": "space coloring book", "search_volume": "Low", "competing_books": "290", "books_broadly_related": "333", "competing_authors": "89", "median_monthly_sales": "$400"},
+        {"keyword": "dinosaur coloring book", "search_volume": "High", "competing_books": "1,300", "books_broadly_related": "1,450", "competing_authors": "310", "median_monthly_sales": "$1,300"},
+        {"keyword": "christmas coloring book", "search_volume": "High", "competing_books": "1,100", "books_broadly_related": "1,250", "competing_authors": "280", "median_monthly_sales": "$1,200"},
+        {"keyword": "superhero coloring book", "search_volume": "Medium", "competing_books": "780", "books_broadly_related": "890", "competing_authors": "190", "median_monthly_sales": "$950"},
+        {"keyword": "cartoon coloring book", "search_volume": "Medium", "competing_books": "670", "books_broadly_related": "760", "competing_authors": "160", "median_monthly_sales": "$850"},
+        {"keyword": "zoo animals coloring book", "search_volume": "Medium", "competing_books": "540", "books_broadly_related": "620", "competing_authors": "140", "median_monthly_sales": "$700"},
+        {"keyword": "under the sea coloring book", "search_volume": "Medium", "competing_books": "490", "books_broadly_related": "560", "competing_authors": "125", "median_monthly_sales": "$670"},
+        {"keyword": "ocean coloring book", "search_volume": "Medium", "competing_books": "470", "books_broadly_related": "530", "competing_authors": "115", "median_monthly_sales": "$650"},
+        {"keyword": "forest coloring book", "search_volume": "Medium", "competing_books": "460", "books_broadly_related": "520", "competing_authors": "110", "median_monthly_sales": "$630"},
+        {"keyword": "farm animals coloring book", "search_volume": "Medium", "competing_books": "440", "books_broadly_related": "500", "competing_authors": "105", "median_monthly_sales": "$610"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "jungle coloring book", "search_volume": "Medium", "competing_books": "480", "books_broadly_related": "540", "competing_authors": "118", "median_monthly_sales": "$690"},
+        {"keyword": "dragon coloring book", "search_volume": "Medium", "competing_books": "510", "books_broadly_related": "580", "competing_authors": "127", "median_monthly_sales": "$720"}
+
+    ]
+
+    total_results = len(sample_data)
+    per_page = 15  # عرض 15 عنصر لكل صفحة
+
+    # تحديد الصفحة الحالية من URL
+    page = request.args.get('page', 1, type=int)
+
+    # حساب القيم
+    start_index = (page - 1) * per_page + 1
+    end_index = min(page * per_page, total_results)
+
+    # تقسيم البيانات لعرضها حسب الصفحة
+    paginated_results = sample_data[start_index - 1:end_index]
+
+    # حساب عدد الصفحات الإجمالي
+    total_pages = (total_results + per_page - 1) // per_page
+
+    if request.method == 'POST':
+        keyword = request.form.get('keyword')
+        language = request.form.get('language')
+        country = request.form.get('country')
+
+        # مثال مؤقت للنتائج حسب البحث
+        results = sample_data
+    else:
+        # عرض بيانات افتراضية على GET
+        keyword = 'coloring'
+        results = paginated_results
+
+    return render_template(
+        'research/keyword_research.html',
+        active_section='Keyword Research',
+        plans=available_plans,
+        user_plan=user_plan,
+        current_plan=current_plan,
+        free_plan=free_plan,
+        #results=results,
+        keyword=keyword,
+        total_results=total_results,
+        start_index=start_index,
+        end_index=end_index,
+        current_page=page,
+        total_pages=total_pages
+    )
+==================================================
+
+=== File: app\routes\research\trademark_search.py ===
+
+from app.routes.research import bp
+import time
+from uuid import uuid4
+from flask import request, render_template, redirect, url_for, session
+from flask_login import login_required
+from bs4 import BeautifulSoup
+import requests
+
+# كاش مؤقت في الذاكرة
+SEARCH_CACHE = {}
+
+@bp.route('/trademark-search', methods=['GET', 'POST'])
+@login_required
+def trademark_search():
+    page = int(request.args.get('page', 1))
+    per_page = 15
+    keyword = request.args.get('keyword', '')
+    search_id = request.args.get('id', '')
+    results = []
+    total_found = 0
+
+    # حذف النتائج المنتهية الصلاحية
+    now = time.time()
+    expired_ids = [k for k, v in SEARCH_CACHE.items() if v['expires'] <= now]
+    for k in expired_ids:
+        del SEARCH_CACHE[k]
+
+    if request.method == 'POST':
+        keyword = request.form.get('keyword', '').strip()
+        if keyword:
+            try:
+                url = f"https://tmsearch.ai/search/?keyword={keyword}"
+                response = requests.get(url, timeout=10)
+                soup = BeautifulSoup(response.content, "html.parser")
+                items = soup.find_all("div", class_=lambda x: x and x.startswith("rb") and "data-group-1" in x)
+
+                for item in items:
+                    d = {}
+                    img_tag = item.select_one(".rb__img img")
+                    title_tag = item.select_one("h3.font_1")
+                    link_tag = item.select_one(".rb__img a")
+
+                    d['Image'] = True if img_tag else False
+                    d['Name_or_Image'] = img_tag['src'] if img_tag else (title_tag.get_text(strip=True) if title_tag else "N/A")
+                    d['Link'] = "https://tmsearch.ai" + link_tag['href'] if link_tag and link_tag.has_attr("href") else "N/A"
+
+                    grant_section = item.select_one(".rb-bottom__grant")
+                    d['Granted'] = grant_section.select_one("p.rb-bottom__date").get_text(strip=True) if grant_section and grant_section.select_one("p.rb-bottom__date") else "N/A"
+
+                    country_codes = item.select("div.country_code")
+                    d['Countries'] = [cc.get_text(strip=True) for cc in country_codes] if country_codes else []
+
+                    d['Status'] = item.select_one("div.result__expiration-status").get_text(strip=True) if item.select_one("div.result__expiration-status") else "N/A"
+                    d['Status_Date'] = item.select_one("span.rb__check-full__date").get_text(strip=True) if item.select_one("span.rb__check-full__date") else "N/A"
+
+                    results.append(d)
+
+                # تخزين النتيجة مع توقيت الانتهاء
+                search_id = str(uuid4())
+                SEARCH_CACHE[search_id] = {
+                    "keyword": keyword,
+                    "results": results,
+                    "expires": now + 3600  # صلاحية: 1 ساعة
+                }
+
+                return redirect(url_for("research.trademark_search", keyword=keyword, id=search_id, page=1))
+
+            except Exception as e:
+                print("❌ Error during scraping:", e)
+
+    elif search_id in SEARCH_CACHE:
+        data = SEARCH_CACHE[search_id]
+        keyword = data['keyword']
+        results = data['results']
+
+    total_found = len(results)
+    start = (page - 1) * per_page
+    end = start + per_page
+    paginated_results = results[start:end]
+
+    return render_template('research/trademark_search.html',
+                           active_section='Trademark Search',
+                           keyword=keyword,
+                           results=paginated_results,
+                           total_found=total_found,
+                           page=page,
+                           per_page=per_page)
+
+
+
+
+@bp.route('/trademark-search/view')
+@login_required
+def trademark_view():
+    id = int(request.args.get('id', -1))
+    data = session.get('trademark_results', [])
+
+    if 0 <= id < len(data):
+        item = data[id]
+    else:
+        item = None
+
+    return render_template("research/trademark_view.html",
+                           active_section="Trademark Search",
+                           item=item)
+==================================================
+
+=== File: app\routes\research\__init__.py ===
+from flask import Blueprint
+
+bp = Blueprint('research', __name__, url_prefix='/')
+
+from . import keyword_research, category_finder, trademark_search  # ← أضف هذا
+
+==================================================
+
+=== File: app\routes\stripe\stripe.py ===
+from flask import Blueprint, request, jsonify, redirect, url_for, current_app, flash
+import stripe
+from app.models import Plan, UserPlan, db
+from flask_login import current_user, login_required
+
+from config import Config
+
+bp = Blueprint('stripe', __name__, url_prefix='/stripe')
+
+from flask import redirect
+
+@bp.route('/create-payment-link/<int:plan_id>', methods=['POST', 'GET'])
+@login_required
+def create_payment_link(plan_id):
+    stripe.api_key = Config.STRIPE_SECRET_KEY
+
+    plan = Plan.query.get(plan_id)
+    if not plan:
+        return jsonify({"error": "Plan not found"}), 404
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            mode='subscription',  # 🔹 تعديل وضع الدفع ليكون اشتراك
+            success_url="http://127.0.0.1:5000/stripe/payment-success?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url="http://127.0.0.1:5000/plans/",
+            line_items=[{
+                "price_data": {
+                    "currency": "usd",
+                    "unit_amount": int(plan.price * 100),
+                    "product_data": {"name": plan.name},
+                    "recurring": {"interval": "month"}  # 🔹 تأكد من أن هذا الحقل موجود
+                },
+                "quantity": 1
+            }],
+            metadata={"plan_id": str(plan_id), "user_id": str(current_user.id)}
+        )
+
+
+        return redirect(checkout_session.url)  # ✅ التوجيه التلقائي إلى صفحة الدفع
+
+    except Exception as e:
+        print(f"Stripe Error: {e}")
+        return jsonify({"error": str(e)}), 500
+@bp.route('/payment-success', methods=['GET'])
+@login_required
+def payment_success():
+    stripe.api_key = Config.STRIPE_SECRET_KEY
+    session_id = request.args.get('session_id')
+
+    if not session_id:
+        flash("Payment session ID is missing!", "error")
+        return redirect(url_for('plans.plans'))
+
+    session = stripe.checkout.Session.retrieve(session_id)
+    plan_id = int(session.metadata.get("plan_id", 0))
+
+    if not plan_id or Plan.query.get(plan_id) is None:
+        flash("Plan ID not found in session metadata!", "error")
+        return redirect(url_for('plans.plans'))
+
+    # ✅ تحديث الاشتراك مباشرةً بدون `payment_status` و `auto_renew`
+    UserPlan.subscribe_user_to_plan(current_user.id, plan_id)
+
+
+
+    flash("Payment successful! Your plan has been updated.", "success")
+    return redirect(url_for('plans.plans'))
+stripe.api_key = Config.STRIPE_SECRET_KEY
+
+
+@bp.route('/cancel-plan', methods=['POST','GET'])
+@login_required
+def cancel_plan():
+    print("🚀 بدء عملية إلغاء الاشتراك...")
+    # 1. جلب اشتراك المستخدم النشط
+    user_plan = UserPlan.get_active_plan(current_user.id)
+    print(f"🔍 تم العثور على user_plan: {user_plan}")
+
+    if not user_plan:
+        print("❌ لم يتم العثور على اشتراك نشط للمستخدم.")
+        flash("⚠️ لا يوجد اشتراك نشط للإلغاء.", "warning")
+        return redirect(url_for('plans.plans'))
+
+    if not user_plan.stripe_subscription_id:
+        print("❌ لا يوجد Stripe Subscription ID في قاعدة البيانات.")
+        flash("⚠️ لا يوجد معرف اشتراك متصل بحساب Stripe.", "warning")
+        return redirect(url_for('plans.plans'))
+
+    print(f"✅ Stripe Subscription ID موجود: {user_plan.stripe_subscription_id}")
+
+    try:
+        # 2. تعيين مفتاح Stripe API
+        stripe.api_key = current_app.config['STRIPE_SECRET_KEY']
+        print("🔑 تم تعيين مفتاح Stripe بنجاح.")
+
+        # 3. استرجاع بيانات الاشتراك من Stripe
+        subscription = stripe.Subscription.retrieve(user_plan.stripe_subscription_id)
+        print(f"📊 حالة الاشتراك الحالية: {subscription}")
+        print(f"📊 حالة الاشتراك الحالية: {subscription.status}")
+
+        if subscription.status in ['canceled', 'unpaid']:
+            print("🚫 الاشتراك قد تم إلغاؤه مسبقًا أو غير مدفوع.")
+            flash("✅ الاشتراك قد تم إلغاؤه مسبقًا.", "info")
+
+        else:
+            # 4. تعطيل التجديد التلقائي فقط (بدون حذف الاشتراك)
+            print("🔄 تعطيل التجديد التلقائي...")
+            subscription = stripe.Subscription.modify(
+                user_plan.stripe_subscription_id,
+                cancel_at_period_end=True
+            )
+            print("✅ تم تعطيل التجديد التلقائي بنجاح في Stripe.")
+            flash("✅ تم تعطيل التجديد التلقائي لاشتراكك.", "info")
+
+        # 5. تحديث قاعدة البيانات
+        print("📂 تحديث قاعدة البيانات...")
+        user_plan.auto_renew = False
+        db.session.commit()
+        print("✅ تم تحديث قاعدة البيانات بنجاح.")
+
+    except stripe.error.StripeError as e:
+        error_msg = e.user_message or str(e)
+        print(f"❌ خطأ في Stripe: {error_msg}")
+        db.session.rollback()
+        flash(f"❌ خطأ في Stripe: {error_msg}", "danger")
+
+    except Exception as e:
+        print(f"❌ حدث خطأ غير متوقع: {str(e)}")
+        db.session.rollback()
+        flash(f"❌ حدث خطأ غير متوقع: {str(e)}", "danger")
+
+    print("🔚 انتهاء عملية إلغاء الاشتراك.")
+    return redirect(url_for('plans.plans'))
+
+
+==================================================
+
+=== File: app\routes\stripe\webhook.py ===
+from flask import Blueprint, request, jsonify
+import stripe
+from app.models import db, UserPlan, User
+from config import Config
+
+bp = Blueprint('webhook', __name__)
+
+
+@bp.route('/webhook', methods=['POST'])
+def webhook():
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature')
+
+    try:
+        event = stripe.Webhook.construct_event(payload, sig_header, Config.STRIPE_WEBHOOK_SECRET)
+    except stripe.error.SignatureVerificationError:
+        return jsonify({"error": "Invalid signature"}), 400
+
+
+    if event.type == 'checkout.session.completed':
+        session = event.data.object
+        user_id = int(session.metadata.get("user_id", 0))
+        subscription_id = session.get("subscription")
+
+
+        user_plan = UserPlan.get_active_plan(user_id)
+        if user_plan and subscription_id:
+            user_plan.stripe_subscription_id = subscription_id
+
+            # 🔹 تأكد من تحديث قاعدة البيانات بإضافة `flush()` قبل `commit()`
+            db.session.flush()
+            db.session.commit()
+
+    return jsonify({"success": True}), 200
+==================================================
+
+=== File: app\routes\stripe\__init__.py ===
+from .stripe import bp as stripe_bp  # نستخدم اسمًا مختلفًا لتجنب التعارض
+bp = stripe_bp  # إعادة تعريف bp لتتوافق مع باقي الهيكل
+==================================================
+
+=== File: app\static\css\style.css ===
+:root {
+    /* الألوان الأساسية */
+    --primary: #FF7F11;
+    --primary-hover: #e6710f;
+    --bg-dark: #0D1B2A;
+    --bg-card: #1F2A44;
+    --border-color: #2D3748;
+    --text-primary: #E0E0E0;
+    --text-secondary: #9CA3AF;
+
+    /* ألوان جديدة مأخوذة من home.html */
+    --success: #4ade80;
+    --danger: #f87171;
+    --hero-gradient-start: #14213D;
+    --hero-gradient-end: #1a2a57;
+    --pricing-popular: #4F46E5;
+    --pricing-popular-hover: #4338CA;
+    --pricing-enterprise: #10B981;
+    --pricing-enterprise-hover: #0D9F6E;
+
+    /* التباينات */
+    --font-size-base: 16px;
+    --font-size-lg: 18px;
+    --font-size-xl: 24px;
+    --spacer-sm: 0.75rem;
+    --spacer-md: 1rem;
+    --spacer-lg: 1.5rem;
+    --border-radius: 0.5rem;
+}
+
+/* عام */
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-primary);
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+}
+
+/* عناوين */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: var(--spacer-md);
+}
+h1 { font-size: var(--font-size-xl); }
+h2 { font-size: var(--font-size-lg); }
+
+/* الحقول */
+.input-field,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select,
+textarea {
+    width: 100%;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: var(--spacer-sm) var(--spacer-md);
+    border-radius: var(--border-radius);
+    margin-bottom: var(--spacer-md);
+}
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(255,127,17,0.2);
+}
+
+/* أزرار */
+button,
+.btn-primary {
+    background-color: var(--primary);
+    color: white;
+    font-weight: 600;
+    padding: var(--spacer-sm) var(--spacer-lg);
+    border-radius: var(--border-radius);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: var(--spacer-md);
+}
+button:hover,
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+/* البطاقات */
+.info-card,
+.auth-box,
+.seo-tool-card,
+.generated-item,
+.comparison-card,
+.profit-metric,
+.tool-group,
+.pricing-card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: var(--spacer-lg);
+    margin-bottom: var(--spacer-lg);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* جدول */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: var(--spacer-lg);
+}
+th, td {
+    padding: var(--spacer-sm) var(--spacer-md);
+    border-bottom: 1px solid var(--border-color);
+}
+th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    text-align: left;
+}
+
+/* عناصر خاصة */
+.copy-btn {
+    background-color: var(--border-color);
+    color: var(--primary);
+    padding: var(--spacer-sm) var(--spacer-md);
+    border-radius: 0.25rem;
+    margin-top: 0;
+}
+.copy-btn:hover {
+    background-color: var(--primary);
+    color: white;
+}
+
+.tag {
+    padding: 0.25rem 0.5rem;
+    border-radius: 9999px;
+    background-color: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    margin-right: 0.5rem;
+    margin-bottom: 0.5rem;
+    display: inline-block;
+}
+.tag:hover {
+    background-color: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.trend-bar {
+    background-color: var(--border-color);
+    border-radius: 9999px;
+    height: 0.625rem;
+}
+.trend-fill {
+    background-color: var(--primary);
+    height: 0.625rem;
+    border-radius: 9999px;
+}
+
+/* ألوان إضافية */
+.text-green-400 { color: var(--success); }
+.text-red-400 { color: var(--danger); }
+.text-gray-400 { color: var(--text-secondary); }
+.text-white { color: #FFFFFF; }
+
+/* تخصيصات من home.html */
+.hero-section {
+    background: linear-gradient(135deg, var(--hero-gradient-start) 0%, var(--hero-gradient-end) 100%);
+    color: white;
+}
+
+.btn-plan {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 5px;
+    font-weight: 600;
+    width: 100%;
+    transition: all 0.2s;
+}
+
+.btn-plan:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-2px);
+}
+
+.btn-outline-plan {
+    background-color: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+
+.btn-outline-plan:hover {
+    background-color: var(--primary);
+    color: white;
+}
+
+.popular-badge {
+    background-color: var(--pricing-popular);
+    color: white;
+}
+
+/* تخصيصات الأدوات من home.html */
+.tool-icon {
+    width: 40px;
+    height: 40px;
+    background-color: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+/* تمرير */
+::-webkit-scrollbar {
+    width: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 3px;
+    transition: background-color 0.3s ease;
+}
+:hover::-webkit-scrollbar-thumb {
+    background-color: var(--primary);
+}
+.scrollable {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+}
+.scrollable:hover {
+    scrollbar-color: var(--primary) transparent;
+}
+
+/* موبايل */
+@media (max-width: 768px) {
+    .info-card, .auth-box, .pricing-card {
+        padding: var(--spacer-md);
+        margin-bottom: var(--spacer-md);
+    }
+}
+/* Hero Section */
+.hero-section {
+    background: linear-gradient(135deg, #14213D 0%, #1a2a57 100%);
+    padding: 5rem 0;
+    color: white;
+}
+
+.hero-title {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+}
+
+.hero-subtitle {
+    font-size: 1.25rem;
+    margin-bottom: 2rem;
+}
+
+/* Testimonials */
+.testimonials {
+    background-color: #f8f9fa;
+}
+
+/* Cards */
+.card {
+    border: none;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: transform 0.3s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2rem;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+    }
+}
+/* تصنيفات الألوان حسب المستوى */
+.text-low {
+    color: #10b981; /* أحمر */
+}
+
+.text-medium {
+    color: #f59e0b; /* برتقالي فاتح */
+}
+
+.text-high {
+    color: #ef4444; /* أخضر لامع */
+}
+/* لون نص N/A */
+.text-na {
+    color: #9CA3AF; /* رمادي فاتح يناسب الواجهة */
+}
+/* تقليل المسافة بين رأس الجدول وجسمه */
+.overflow-x-auto {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+
+
+/* ضبط الحواف والحدود للجداول */
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+th, td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #2D3748;
+    white-space: normal;
+}
+
+th {
+    background-color: #1F2A44;
+    color: #E0E0E0;
+    font-weight: 600;
+}
+
+td {
+    color: #E0E0E0;
+}
+==================================================
+
+=== File: app\static\js\script.js ===
+
+==================================================
+
+=== File: app\templates\404.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen text-center px-4">
+    <h1 class="text-5xl font-bold text-yellow-500 mb-4">الصفحة غير موجودة</h1>
+    <p class="text-xl text-gray-300 mb-6">الصفحة التي تبحث عنها قد تم حذفها أو تغيير اسمها.</p>
+    <a href="{{ url_for('home.home') }}" class="btn-primary">العودة إلى الصفحة الرئيسية</a>
+</div>
+{% endblock %}
+==================================================
+
+=== File: app\templates\base.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KdpCheck - {{ active_section }}</title>
+    <script src="https://cdn.tailwindcss.com "></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css ">
+
+</head>
+<body class="bg-[#0D1B2A] text-[#E0E0E0] min-h-screen flex flex-col">
+
+<!-- Header -->
+<header class="bg-[#14213D] p-5 flex justify-between items-center">
+    <div class="flex items-center">
+        <a href="#" class="text-white text-xl font-bold">KdpCheck</a>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="flex items-center space-x-4">
+
+        <!-- Account Dropdown -->
+        <div class="relative group">
+            <button type="button"
+                    class="flex items-center text-gray-300 hover:text-[#FF7F11] transition-colors bg-transparent">
+                <i class="fas fa-user-circle mr-2 text-xl"></i>
+                {% if current_user.is_authenticated %}
+                <span>{{ current_user.first_name }}</span>
+                {% else %}
+                <span>Guest</span>
+                {% endif %}
+
+                <i class="fas fa-caret-down ml-2"></i>
+            </button>
+
+            <!-- Dropdown Menu -->
+            <div class="hidden group-hover:block absolute top-full right-0 mt-1 bg-[#1F2A44] py-2 px-4 rounded-md shadow-md z-10 min-w-[160px]">
+                <!-- base.html -->
+                {% if current_user.is_authenticated %}
+                <a href="{{ url_for('account.account') }}" class="btn-secondary">My Account</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn-primary">Logout</a>
+                {% else %}
+                <a href="{{ url_for('auth.login') }}" class="btn-secondary">Login</a>
+                <a href="{{ url_for('auth.register') }}" class="btn-primary">Register</a>
+                {% endif %}
+            </div>
+
+        </div>
+    </nav>
+</header>
+
+<!-- Main Layout -->
+<div class="flex flex-1 overflow-hidden">
+    <!-- Sidebar -->
+    <!-- Sidebar -->
+    <aside class="w-64 bg-[#14213D] p-5 h-screen fixed left-0 top-0 overflow-y-auto">
+        <h1 class="text-white text-xl font-bold mb-8">KdpCheck</h1>
+        <nav class="space-y-8">
+
+            <ul class="space-y-1">
+                <li>
+                    <a href="{{ url_for('generator.title_generator') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Title Generator' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-heading mr-2"></i> Title Generator
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('generator.subtitle_generator') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Subtitle Generator' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-heading mr-2"></i> Subtitle Generator
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('generator.description_generator') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Description Generator' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-align-left mr-2"></i> Description Generator
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('generator.author_name_generator') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Author Name' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-user mr-2"></i> Author Generator
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ url_for('research.keyword_research') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Keyword Research' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-hashtag mr-2"></i> Keyword Research
+                    </a>
+                </li>
+                <li>
+                    <a href="{{ url_for('research.category_finder') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Category Finder' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-folder mr-2"></i> Category Finder
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ url_for('planning_tools.royalty_calculator') }}"
+
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+                      {% if active_section == 'Royalty Calculator' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-calculator mr-2"></i> Royalty Calculator
+                    </a>
+                </li>
+
+                <li>
+                    <a href="{{ url_for('research.trademark_search') }}"
+                       class="block w-full text-left px-3 py-2 rounded-md transition-colors duration-200
+      {% if active_section == 'Trademark Search' %}bg-[#FF7F11] text-white{% else %}hover:bg-[#FF7F11]/20 text-gray-300{% endif %}">
+                        <i class="fas fa-search mr-2"></i> Trademark Search
+                    </a>
+                </li>
+
+            </ul>
+
+
+        </nav>
+    </aside>
+    <!-- Main Content -->
+    <main class="ml-64 flex-1 overflow-y-auto py-8 px-4 sm:px-8">
+        <div class="w-full max-w-5xl mx-auto space-y-8">
+
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+
+</div>
+
+<!-- Footer -->
+<footer class="bg-[#14213D] py-6 px-8 mt-auto">
+    <div class="flex flex-col md:flex-row justify-between items-center gap-4">
+        <p class="text-gray-400 text-sm">&copy; 2025 KdpCheck. All rights reserved.</p>
+        <div class="flex gap-4">
+            <!-- Social media icons same as in React version -->
+        </div>
+        <div class="flex gap-6 text-sm text-gray-400">
+            <a href="#" class="hover:text-[#FF7F11] transition-colors">Terms</a>
+            <a href="#" class="hover:text-[#FF7F11] transition-colors">Privacy Policy</a>
+        </div>
+    </div>
+</footer>
+
+</body>
+</html>
+==================================================
+
+=== File: app\templates\base_auth.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KdpCheck - {% block title %}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Auth Styles */
+        .auth-container {
+            background-color: #0D1B2A;
+            min-height: 100vh;
+        }
+        .auth-box {
+            background: #1F2A44;
+            border: 1px solid #2D3748;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .auth-input {
+            background-color: #0D1B2A;
+            border: 1px solid #2D3748;
+            color: white;
+        }
+        .auth-input:focus {
+            outline: none;
+            border-color: #FF7F11;
+            box-shadow: 0 0 0 2px rgba(255, 127, 17, 0.2);
+        }
+        .auth-btn {
+            background-color: #FF7F11;
+            color: white;
+            transition: all 0.2s;
+        }
+        .auth-btn:hover {
+            background-color: #e6710f;
+        }
+        .auth-link {
+            color: #FF7F11;
+            transition: all 0.2s;
+        }
+        .auth-link:hover {
+            color: #e6710f;
+            text-decoration: underline;
+        }
+
+        /* Flash Messages Styles */
+        .flash-messages {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 300px;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+            animation: fadeInUp 0.3s ease-out;
+            transition: transform 0.2s ease;
+        }
+
+        .alert:hover {
+            transform: translateX(-5px);
+        }
+
+        .alert-success { background-color: var(--success); }
+        .alert-danger { background-color: var(--danger); }
+        .alert-warning { background-color: #eab308; }
+        .alert-info { background-color: #3b82f6; }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="auth-container flex items-center justify-center p-4">
+<div class="auth-box w-full max-w-md rounded-lg p-8">
+
+    {% block content %}{% endblock %}
+
+    <div class="fixed top-4 right-4 z-50 space-y-2 max-w-sm w-full">
+        <!-- app/templates/base_auth.html -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+    </div>
+
+    <footer class="mt-8 text-center text-gray-400 text-sm">
+        {% block footer %}
+        Copyright © KdpCheck 2020 - 2025<br>
+        <a href="#" class="auth-link">Privacy Policy</a> ·
+        <a href="#" class="auth-link">Terms & Conditions</a>
+        {% endblock %}
+    </footer>
+</div>
+</body>
+</html>
+==================================================
+
+=== File: app\templates\error.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen text-center px-4">
+    <h1 class="text-5xl font-bold text-red-500 mb-4">خطأ داخلي</h1>
+    <p class="text-xl text-gray-300 mb-6">عذرًا، حدث خطأ داخلي في الخادم.</p>
+    <a href="{{ url_for('home.home') }}" class="btn-primary">العودة إلى الصفحة الرئيسية</a>
+</div>
+{% endblock %}
+==================================================
+
+=== File: app\templates\forbidden.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen text-center px-4">
+    <h1 class="text-5xl font-bold text-orange-500 mb-4">غير مسموح</h1>
+    <p class="text-xl text-gray-300 mb-6">ليس لديك الصلاحية للوصول إلى هذه الصفحة.</p>
+    <a href="{{ url_for('home.home') }}" class="btn-primary">العودة إلى الصفحة الرئيسية</a>
+</div>
+{% endblock %}
+==================================================
+
+=== File: app\templates\account\account.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg max-w-md mx-auto mt-8">
+    <h2 class="text-2xl font-bold text-white mb-4">Account Info</h2>
+
+    {% if user %}
+    <p><strong>Email:</strong> {{ user.email }}</p>
+    <p><strong>Name:</strong> {{ user.first_name }} {{ user.last_name }}</p>
+
+    {% endif %}
+</div>
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\account\edit_account.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg max-w-md mx-auto mt-8">
+    <h2 class="text-2xl font-bold text-white mb-4">Edit Account</h2>
+    <form method="POST">
+        <label class="block text-gray-300 mb-2">First Name</label>
+        <input type="text" name="first_name" class="input-field" value="{{ user.first_name }}">
+
+        <label class="block text-gray-300 mb-2">Last Name</label>
+        <input type="text" name="last_name" class="input-field" value="{{ user.last_name }}">
+
+        <label class="block text-gray-300 mb-2">Email</label>
+        <input type="email" name="email" class="input-field" value="{{ user.email }}">
+
+        <button type="submit" class="btn-primary">Save Changes</button>
+    </form>
+</div>
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\auth\login.html ===
+{% extends "base_auth.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-center text-white mb-6">Login</h1>
+<form method="POST">
+    {{ form.csrf_token }}
+    <div class="mb-4">
+        {{ form.email.label(class="block text-gray-300 mb-2") }}
+        {{ form.email(class="auth-input w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-[#FF7F11]") }}
+    </div>
+    <div class="mb-4">
+        {{ form.password.label(class="block text-gray-300 mb-2") }}
+        {{ form.password(class="auth-input w-full px-4 py-2 rounded-lg focus:ring-2 focus:ring-[#FF7F11]") }}
+    </div>
+    <div class="flex justify-between items-center mb-4">
+        <a href="{{ url_for('auth.reset_password_request') }}" class="auth-link text-sm">Forgot Password?</a>
+    </div>
+    {{ form.submit(class="auth-btn w-full py-2 rounded-lg font-medium") }}
+    <div class="text-center mt-4 text-gray-300">
+        Need an account? <a href="{{ url_for('auth.register') }}" class="auth-link">Sign up!</a>
+    </div>
+</form>
+{% endblock %}
+==================================================
+
+=== File: app\templates\auth\register.html ===
+{% extends "base_auth.html" %}
+{% block title %}Create Account{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-center text-white mb-6">Create Account</h1>
+<form method="POST">
+    {{ form.csrf_token }}
+    <div class="mb-4">
+        {{ form.first_name.label }}
+        {{ form.first_name(class="auth-input w-full px-4 py-2 rounded-lg") }}
+    </div>
+    <div class="mb-4">
+        {{ form.last_name.label }}
+        {{ form.last_name(class="auth-input w-full px-4 py-2 rounded-lg") }}
+    </div>
+    <div class="mb-4">
+        {{ form.email.label }}
+        {{ form.email(class="auth-input w-full px-4 py-2 rounded-lg") }}
+    </div>
+    <div class="mb-4">
+        {{ form.password.label }}
+        {{ form.password(class="auth-input w-full px-4 py-2 rounded-lg") }}
+    </div>
+    <div class="mb-4">
+        {{ form.confirm_password.label }}
+        {{ form.confirm_password(class="auth-input w-full px-4 py-2 rounded-lg") }}
+    </div>
+    {{ form.submit(class="auth-btn w-full py-2 rounded-lg font-medium") }}
+    <div class="text-center mt-4 text-gray-300">
+        Already have an account? <a href="{{ url_for('auth.login') }}" class="auth-link">Login</a>
+    </div>
+</form>
+{% endblock %}
+==================================================
+
+=== File: app\templates\auth\reset_password.html ===
+{% extends "base_auth.html" %}
+{% block title %}Reset Password{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-center text-white mb-6">Set New Password</h1>
+<form method="POST">
+    {{ form.csrf_token }}
+    <div class="mb-4">
+        {{ form.password.label(class="block text-gray-300 mb-2") }}
+        {{ form.password(class="auth-input w-full px-4 py-2 rounded-lg") }}
+        {% for error in form.password.errors %}
+        <span class="text-red-400 text-sm">{{ error }}</span>
+        {% endfor %}
+    </div>
+    <div class="mb-4">
+        {{ form.confirm_password.label(class="block text-gray-300 mb-2") }}
+        {{ form.confirm_password(class="auth-input w-full px-4 py-2 rounded-lg") }}
+        {% for error in form.confirm_password.errors %}
+        <span class="text-red-400 text-sm">{{ error }}</span>
+        {% endfor %}
+    </div>
+    {{ form.submit(class="auth-btn w-full py-2 rounded-lg font-medium") }}
+</form>
+{% endblock %}
+==================================================
+
+=== File: app\templates\auth\reset_password_request.html ===
+{% extends "base_auth.html" %}
+{% block title %}Reset Password{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold text-center text-white mb-6">Reset Password</h1>
+<form method="POST">
+    {{ form.csrf_token }}
+    <div class="mb-4">
+        {{ form.email.label(class="block text-gray-300 mb-2") }}
+        {{ form.email(class="auth-input w-full px-4 py-2 rounded-lg") }}
+        {% for error in form.email.errors %}
+        <span class="text-red-400 text-sm">{{ error }}</span>
+        {% endfor %}
+    </div>
+    {{ form.submit(class="auth-btn w-full py-2 rounded-lg font-medium") }}
+    <div class="text-center mt-4 text-gray-300">
+        Remember your password? <a href="{{ url_for('auth.login') }}" class="auth-link">Login</a>
+    </div>
+</form>
+{% endblock %}
+==================================================
+
+=== File: app\templates\email\check_email.html ===
+<!-- app/templates/auth/check_email.html -->
+
+{% extends "base_auth.html" %}
+
+{% block title %}Check Email{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-screen px-4">
+    <h1 class="text-2xl font-bold text-white mb-6">Check Your Email</h1>
+    <p class="text-gray-300 mb-6 text-center">
+        Please check your inbox.<br>
+        We've sent a verification link to the email you provided.
+    </p>
+    <a href="{{ url_for('home.home') }}" class="auth-btn px-6 py-2 rounded-lg font-medium">
+        Return to Home Page
+    </a>
+</div>
+{% endblock %}
+==================================================
+
+=== File: app\templates\generator_tools\author_name_generator.html ===
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Author Name Generator</h1>
+    <p class="text-gray-300">Generate optimized author names for your KDP listings</p>
+</header>
+
+<!-- Main Card -->
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <form method="POST" class="space-y-6">
+        <!-- Language Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Language:</label>
+            <select name="language" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="en-US">English (US)</option>
+                <option value="fr-FR">French (FR)</option>
+                <option value="es-ES">Spanish (ES)</option>
+                <option value="de-DE">German (DE)</option>
+            </select>
+        </div>
+
+        <!-- Country Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Country:</label>
+            <select name="country" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="US">United States</option>
+                <option value="FR">France</option>
+                <option value="ES">Spain</option>
+                <option value="DE">Germany</option>
+            </select>
+        </div>
+
+        <!-- Gender Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Gender:</label>
+            <div class="flex space-x-4">
+                <div class="flex items-center">
+                    <input id="male" name="gender" type="radio" class="mr-2" value="male" checked>
+                    <label for="male" class="text-gray-300">Male</label>
+                </div>
+                <div class="flex items-center">
+                    <input id="female" name="gender" type="radio" class="mr-2" value="female">
+                    <label for="female" class="text-gray-300">Female</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fields to Generate -->
+        <div>
+            <label class="block text-gray-300 mb-2">Fields to generate:</label>
+            <div class="flex flex-wrap gap-4">
+                <div class="flex items-center">
+                    <input id="prefix" name="fields" type="checkbox" class="mr-2" value="Prefix" checked>
+                    <label for="prefix" class="text-gray-300">Prefix</label>
+                </div>
+                <div class="flex items-center">
+                    <input id="first-name-check" name="fields" type="checkbox" class="mr-2" value="First Name" checked disabled>
+                    <label for="first-name-check" class="text-gray-300">First Name</label>
+                </div>
+                <div class="flex items-center">
+                    <input id="middle-name-check" name="fields" type="checkbox" class="mr-2" value="Middle Name" checked>
+                    <label for="middle-name-check" class="text-gray-300">Middle Name</label>
+                </div>
+                <div class="flex items-center">
+                    <input id="last-name-check" name="fields" type="checkbox" class="mr-2" value="Last Name" checked disabled>
+                    <label for="last-name-check" class="text-gray-300">Last Name</label>
+                </div>
+                <div class="flex items-center">
+                    <input id="suffix-check" name="fields" type="checkbox" class="mr-2" value="Suffix" checked>
+                    <label for="suffix-check" class="text-gray-300">Suffix</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Button -->
+        <button type="submit" class="bg-[#FF7F11] text-white font-semibold py-3 px-6 rounded transition hover:bg-orange-500 mr-2">
+            Generate Author Name
+        </button>
+        <button type="reset" class="bg-red-600 text-white font-semibold py-3 px-6 rounded transition hover:bg-red-700">
+            Clear
+        </button>
+    </form>
+</div>
+
+<!-- Results Section -->
+{% if full_name %}
+<div class="mt-8 bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <h2 class="text-xl font-semibold text-white mb-4">Generated Author Name</h2>
+
+    {% for field in ['Prefix', 'First Name', 'Middle Name', 'Last Name', 'Suffix'] %}
+    <div class="mb-4 flex items-center justify-between">
+        <label class="block text-gray-300 w-32">{{ field }}</label>
+
+        {% if field in full_name and full_name[field] %}
+        <p id="{{ field | lower | replace(' ', '-') }}-result" class="text-gray-300 bg-[#0D1B2A] border border-gray-600 rounded-md py-2 px-4 flex-1 mx-4">
+            {{ full_name[field] }}
+        </p>
+        {% else %}
+        <input type="text" readonly placeholder="{{ field }}"
+               class="text-gray-500 bg-[#0D1B2A] border border-gray-600 rounded-md py-2 px-4 flex-1 mx-4 cursor-not-allowed" />
+        {% endif %}
+
+        <button onclick="copyText('{{ field | lower | replace(' ', '-') }}-result')" class="ml-2 bg-[#FF7F11] text-white font-semibold py-1 px-3 rounded transition hover:bg-orange-500">
+            <i class="fas fa-copy"></i>
+        </button>
+    </div>
+    {% endfor %}
+
+
+</div>
+{% endif %}
+
+<script>
+    function copyText(id) {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text);
+    }
+</script>
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\generator_tools\description_generator.html ===
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .a-expander-content {
+      padding-bottom: 24px;
+      font-family: Arial, sans-serif;
+      color: #111;
+      line-height: 1.6;
+    }
+    .a-text-bold {
+      font-weight: 700;
+    }
+    .a-unordered-list {
+      list-style-type: none;
+      padding-left: 0;
+      margin-top: 0;
+      margin-bottom: 1rem;
+    }
+    .a-unordered-list.a-vertical {
+      display: block;
+    }
+    .a-list-item {
+      position: relative;
+      padding-left: 1.25em;
+      margin-bottom: 0.5em;
+    }
+    .a-list-item::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: #555;
+    }
+</style>
+
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Description Generator</h1>
+    <p class="text-gray-300">Generate optimized KDP product descriptions</p>
+</header>
+
+<!-- Main Card -->
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <form method="POST" class="space-y-6">
+        <!-- Product Name Input -->
+        <div>
+            <label class="block text-gray-300 mb-2">What are you selling?</label>
+            <input type="text" name="product" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]" placeholder="Example: Wooden jewelry box">
+        </div>
+
+        <!-- Keywords Input -->
+        <div>
+            <label class="block text-gray-300 mb-2">Keywords:</label>
+            <textarea type="text" name="keywords" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]" placeholder="Example: handmade, antique, birthday gift"></textarea>
+        </div>
+
+        <!-- Language Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Language:</label>
+            <select name="language" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="en-US">English (US)</option>
+                <option value="fr-FR">French (FR)</option>
+                <option value="es-ES">Spanish (ES)</option>
+                <option value="de-DE">German (DE)</option>
+            </select>
+        </div>
+
+        <!-- داخل الـ form في generator_tools/description_generator.html -->
+
+        <!-- Binding Type -->
+        <div>
+            <label class="block text-gray-300 mb-2">Binding Type:</label>
+            <select name="binding_type" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="Paperback">Paperback</option>
+                <option value="Hardcover">Hardcover</option>
+                <option value="Spiral">Spiral</option>
+                <option value="Saddle Stitch">Saddle Stitch</option>
+            </select>
+        </div>
+
+        <!-- Interior Type -->
+        <div>
+            <label class="block text-gray-300 mb-2">Interior Type:</label>
+            <select name="interior_type" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="Blank">Blank</option>
+                <option value="Lined">Lined</option>
+                <option value="Graph">Graph</option>
+                <option value="Dot Grid">Dot Grid</option>
+                <option value="Planner">Planner</option>
+            </select>
+        </div>
+
+        <!-- Page Count -->
+        <div>
+            <label class="block text-gray-300 mb-2">Page Count:</label>
+            <input type="number" name="page_count" min="10" max="1000" value="100" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]" placeholder="Enter number of pages">
+        </div>
+
+        <!-- Interior Trim Size -->
+        <div>
+            <label class="block text-gray-300 mb-2">Interior Trim Size:</label>
+            <select name="interior_trim_size" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="5 x 8 in">5 x 8 in</option>
+                <option value="5.25 x 8 in">5.25 x 8 in</option>
+                <option value="5.5 x 8.5 in">5.5 x 8.5 in</option>
+                <option value="6 x 9 in">6 x 9 in</option>
+                <option value="5.06 x 7.81 in">5.06 x 7.81 in</option>
+                <option value="6.14 x 9.21 in">6.14 x 9.21 in</option>
+                <option value="6.69 x 9.61 in">6.69 x 9.61 in</option>
+                <option value="7 x 10 in">7 x 10 in</option>
+                <option value="7.44 x 9.69 in">7.44 x 9.69 in</option>
+                <option value="7.5 x 9.25 in">7.5 x 9.25 in</option>
+                <option value="8 x 10 in">8 x 10 in</option>
+                <option value="8.5 x 11 in">8.5 x 11 in</option>
+                <option value="8.27 x 11.69 in">8.27 x 11.69 in</option>
+                <option value="8.25 x 6 in">8.25 x 6 in</option>
+                <option value="8.25 x 8.25 in">8.25 x 8.25 in</option>
+                <option value="8.5 x 8.5 in">8.5 x 8.5 in</option>
+            </select>
+        </div>
+
+
+        <!-- Length of Description Slider -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Length of description:
+                <span id="length-label" class="ml-2 text-gray-300">Medium</span>
+            </label>
+            <input type="range" name="description_length" min="1" max="5" step="1" value="3" class="w-full h-2 bg-gray-600 rounded-full appearance-none cursor-pointer range-slider" id="length-slider">
+        </div>
+
+        <!-- Generate Button -->
+        <button type="submit" class="bg-[#FF7F11] text-white font-semibold py-3 px-6 rounded transition hover:bg-orange-500 mr-2">
+            Generate Description
+        </button>
+        <button type="reset" class="bg-red-600 text-white font-semibold py-3 px-6 rounded transition hover:bg-red-700">
+            Clear
+        </button>
+    </form>
+</div>
+
+<!-- Results Section -->
+{% if generated_description %}
+<div class="mt-8 bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-white">Generated Description</h2>
+        <button class="text-[#FF7F11] hover:text-white transition" onclick="copyToClipboard()">Copy</button>
+    </div>
+
+    <!-- HTML Preview Box -->
+    <div class="generated-item bg-white text-black p-4 rounded border border-gray-600 min-h-[100px] max-w-none" style="all: unset; display: block; padding: 1rem; color: black; background: white; border-radius: 0.5rem; border: 1px solid #4B5563; min-height: 100px; max-width: 100%;">
+        {{ generated_description | safe }}
+    </div>
+
+
+
+</div>
+
+<script>
+    function copyToClipboard() {
+        const temp = document.createElement("textarea");
+        temp.value = `{{ generated_description | safe }}`.replace(/<\/?[^>]+(>|$)/g, "");
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand("copy");
+        document.body.removeChild(temp);
+    }
+</script>
+{% endif %}
+
+
+<script>
+    const slider = document.getElementById('length-slider');
+    const label = document.getElementById('length-label');
+
+    // نصوص الطول بناءً على القيمة
+    const lengthLabels = [
+      'Very Short',
+      'Short',
+      'Medium',
+      'Long',
+      'Very Long'
+    ];
+
+    function updateLabel() {
+      const value = parseInt(slider.value) - 1;
+      label.textContent = lengthLabels[value];
+    }
+
+    slider.addEventListener('input', updateLabel);
+    updateLabel();
+</script>
+{% endblock %}
+==================================================
+
+=== File: app\templates\generator_tools\subtitle_generator.html ===
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Subtitle Generator</h1>
+    <p class="text-gray-300">Generate optimized subtitles for your KDP listings</p>
+</header>
+
+<!-- Main Card -->
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <form method="POST" class="space-y-6">
+        <!-- Book Title Input -->
+        <div>
+            <label class="block text-gray-300 mb-2">Book Title</label>
+            <input type="text" name="book_title"
+                   class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]"
+                   placeholder="e.g., The Power of Now">
+        </div>
+
+        <!-- Book Type Dropdown -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Book Type</label>
+            <select name="book_type"
+                    class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="Children's Book">Children's Book</option>
+                <option value="Cookbook">Cookbook</option>
+                <option value="Journal">Journal</option>
+                <option value="Coloring Book">Coloring Book</option>
+                <option value="Self-Help">Self-Help</option>
+            </select>
+        </div>
+
+        <!-- Language Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Language</label>
+            <select name="language"
+                    class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+            </select>
+        </div>
+        <!-- Keywords Textarea -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Keywords (Optional)</label>
+            <textarea rows="4" name="keywords"
+                      class="w-full bg-[#0D1B2A] text-white borderborder-red-500 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]"
+                      placeholder="Enter key features like style, material, or occasion"></textarea>
+        </div>
+        <!-- Generate Button + Clear Button -->
+        <button type="submit"
+                class="bg-[#FF7F11] text-white font-bold py-3 px-4 rounded transition hover:bg-orange-500">
+            Generate Title
+        </button>
+        <button type="reset"
+                class="bg-red-600 text-white font-semibold py-3 px-4 rounded transition hover:bg-red-700 ml-2">
+            Clear
+        </button>
+    </form>
+</div>
+
+<!-- Results Card -->
+{% if generated_subtitle %}
+<div class="mt-8 bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-white">Generated Subtitle</h2>
+        <button class="text-[#FF7F11] hover:text-white transition">Copy</button>
+    </div>
+    <div class="generated-item bg-[#0D1B2A] p-4 rounded border border-gray-600">
+        {% if generated_subtitle %}
+        <p class="text-gray-300">{{ generated_subtitle }}</p>
+        {% else %}
+        <p class="text-gray-300">This is a sample generated subtitle...</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+==================================================
+
+=== File: app\templates\generator_tools\title_generator.html ===
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Title Generator</h1>
+    <p class="text-gray-300">Generate optimized Kdp titles for your product</p>
+</header>
+
+<!-- Main Card -->
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <form method="POST" class="space-y-6">
+        <!-- Book Name Input -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Book Name</label>
+            <input type="text" required name="book_name" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]" placeholder="e.g., The Art of Minimalism">
+            {% if form.book_name.errors %}
+            <p class="text-red-500 text-sm mt-1">{{ form.book_name.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+
+        <!-- Book Type Dropdown -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Book Type</label>
+            <select name="book_type" class="w-full bg-[#0D1B2A] text-white border {% if form.book_type.errors %}border-red-500{% else %}border-gray-600{% endif %} rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                {% for value, label in form.book_type.choices %}
+                <option value="{{ value }}" {% if form.book_type.data == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            {% if form.book_type.errors %}
+            <p class="text-red-500 text-sm mt-1">{{ form.book_type.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Language Selector -->
+        <div>
+            <label class="block text-gray-300 mb-2">Language</label>
+            <select name="language" class="w-full bg-[#0D1B2A] text-white border border-gray-600 rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]">
+                {% for value, label in form.book_lang.choices %}
+                <option value="{{ value }}" {% if form.book_lang.data == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+
+            </select>
+        </div>
+
+        <!-- Keywords Textarea -->
+        <div class="mb-4">
+            <label class="block text-gray-300 mb-2">Keywords (Optional)</label>
+            <textarea rows="4" name="keywords" class="w-full bg-[#0D1B2A] text-white border {% if form.keywords and form.keywords.errors %}border-red-500{% else %}border-gray-600{% endif %} rounded-md py-2 px-4 focus:outline-none focus:border-[#FF7F11]" placeholder="Enter key features like style, material, or occasion">{{ form.keywords.data or '' }}</textarea>
+            {% if form.keywords and form.keywords.errors %}
+            <p class="text-red-500 text-sm mt-1">{{ form.keywords.errors[0] }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Generate Button + Clear Button -->
+        <button type="submit" class="bg-[#FF7F11] text-white font-bold py-3 px-4 rounded transition hover:bg-orange-500">
+            Generate Title
+        </button>
+        <button type="reset" class="bg-red-600 text-white font-semibold py-3 px-4 rounded transition hover:bg-red-700 ml-2">
+            Clear
+        </button>
+    </form>
+</div>
+
+<!-- Results Card -->
+{% if generated_title %}
+<div class="mt-8 bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold text-white">Generated Title</h2>
+        <button onclick="copyText('generated-title')" class="text-[#FF7F11] hover:text-white transition">Copy</button>
+    </div>
+    <div id="generated-title" class="generated-item bg-[#0D1B2A] p-4 rounded border border-gray-600 ">
+        <p class="text-gray-300">{{ generated_title }}</p>
+    </div>
+</div>
+{% endif %}
+
+
+
+{% endblock %}
+==================================================
+
+=== File: app\templates\home\home.html ===
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>KdpCheck - Your Kdp Shop Toolkit</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <style>
+        /* General Styles */
+        body {
+          font-family: 'Inter', sans-serif;
+          background-color: #0D1B2A;
+          color: #E0E0E0;
+          margin: 0;
+          padding: 0;
+        }
+        .container {
+          max-width: 1200px;
+          margin: 0 auto;
+          padding: 0 1rem;
+        }
+
+        /* Section Dividers */
+        .section-divider {
+          height: 1px;
+          background: linear-gradient(90deg, transparent, #FF7F11, transparent);
+          margin: 2rem auto;
+          width: 80%;
+          opacity: 0.3;
+        }
+        .section-divider-thick {
+          height: 4px;
+          background: linear-gradient(90deg, transparent, #FF7F11, transparent);
+          width: 80%;
+          opacity: 0.5;
+        }
+        .section-divider-dots {
+          height: 2px;
+          background: transparent;
+          border-top: 2px dotted #FF7F11;
+          margin: 1rem auto;
+          width: 60%;
+          opacity: 0.5;
+        }
+
+        /* Header Styles */
+        header {
+          position: sticky;
+          top: 0;
+          z-index: 999;
+          background-color: #0D1B2A;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+          padding: 0.75rem 1rem;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          border-bottom: 1px solid #1F2A44;
+        }
+        header a {
+          text-decoration: none;
+          color: white;
+          transition: color 0.2s;
+        }
+        header a:hover {
+          color: #FF7F11;
+        }
+        .btn-primary {
+          background-color: #FF7F11;
+          color: white;
+          border: none;
+          border-radius: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-primary:hover {
+          background-color: #e6710f;
+        }
+        .btn-secondary {
+          background-color: transparent;
+          color: #FF7F11;
+          border: 2px solid #FF7F11;
+          border-radius: 0.5rem;
+          padding: 0.75rem 1.5rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .btn-secondary:hover {
+          background-color: #FF7F11;
+          color: white;
+        }
+
+        /* Navigation */
+        nav {
+          display: none;
+        }
+        @media (min-width: 768px) {
+          nav {
+            display: flex;
+            gap: 1.5rem;
+          }
+        }
+
+        /* Hero Section Styles */
+        .hero-section {
+          background-color: #0D1B2A;
+          padding: 3rem 0 2rem;
+          position: relative;
+        }
+        .hero-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+        @media (min-width: 768px) {
+          .hero-content {
+            flex-direction: row;
+            align-items: center;
+          }
+        }
+        .hero-text {
+          flex: 1;
+        }
+        .hero-image {
+          flex: 1;
+        }
+        .hero-section h1 {
+          font-size: 2.5rem;
+          line-height: 1.2;
+          color: #FF7F11;
+          margin-bottom: 1rem;
+        }
+        .hero-section p {
+          font-size: 1.25rem;
+          line-height: 1.6;
+          margin-bottom: 1.5rem;
+        }
+        .hero-buttons {
+          display: flex;
+          gap: 1rem;
+          margin-bottom: 1rem;
+        }
+        .hero-image img {
+          width: 100%;
+          height: auto;
+          max-width: 100%;
+        }
+
+        /* Tools Section Styles */
+        .tools-section {
+          background-color: #14233C; /* New background color */
+          padding: 2rem 0;
+        }
+        .section-title {
+          text-align: center;
+          font-size: 2rem;
+          font-weight: bold;
+          color: white;
+          margin-bottom: 2rem;
+          position: relative;
+          display: inline-block;
+          left: 50%;
+          transform: translateX(-50%);
+        }
+        .section-title:after {
+          content: '';
+          display: block;
+          width: 50%;
+          height: 3px;
+          background: #FF7F11;
+          margin: 0.5rem auto 0;
+          border-radius: 3px;
+        }
+        .tools-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 1rem;
+        }
+        @media (min-width: 640px) {
+          .tools-grid {
+            grid-template-columns: repeat(2, 1fr);
+          }
+        }
+        @media (min-width: 768px) {
+          .tools-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1200px) {
+          .tools-grid {
+            grid-template-columns: repeat(4, 1fr);
+          }
+        }
+        .tool-card {
+          background-color: #1F2A44;
+          border: 1px solid #2D3748;
+          border-radius: 0.5rem;
+          padding: 1.5rem;
+          transition: all 0.3s;
+        }
+        .tool-card:hover {
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+          border-color: #FF7F11;
+          transform: translateY(-5px);
+        }
+        .tool-icon {
+          color: #FF7F11;
+          font-size: 1.5rem;
+          margin-bottom: 1rem;
+        }
+        .tool-name {
+          font-size: 1.125rem;
+          font-weight: 600;
+          color: white;
+          margin-bottom: 0.5rem;
+        }
+        .tool-desc {
+          color: #9CA3AF;
+          font-size: 0.875rem;
+        }
+        @media (min-width: 768px) {
+          .pricing-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        .pricing-card {
+          background-color: #1F2A44;
+          border: 2px solid;
+          border-radius: 0.5rem;
+          padding: 2rem;
+          transition: transform 0.3s;
+          position: relative;
+        }
+        .pricing-card:hover {
+          transform: scale(1.05);
+        }
+        .pricing-card.free {
+          border-color: #4F46E5;
+        }
+        .pricing-card.business {
+          border-color: #FF7F11;
+        }
+        .pricing-card.enterprise {
+          border-color: #10B981;
+        }
+        .popular-badge {
+          position: absolute;
+          top: 0;
+          right: 0;
+          background-color: #FF7F11;
+          color: white;
+          font-size: 0.75rem;
+          font-weight: bold;
+          padding: 0.25rem 0.75rem;
+          border-bottom-left-radius: 0.5rem;
+        }
+        .pricing-title {
+          font-size: 1.5rem;
+          font-weight: bold;
+          color: white;
+          margin-bottom: 0.1rem;
+        }
+        .pricing-desc {
+          color: #9CA3AF;
+          margin-bottom: 1.5rem;
+        }
+        .price {
+          font-size: 2.25rem;
+          font-weight: bold;
+          color: white;
+          margin-bottom: 1.5rem;
+        }
+        .price span {
+          font-size: 1rem;
+          color: #9CA3AF;
+        }
+        .pricing-btn {
+          width: 100%;
+          padding: 0.75rem;
+          border-radius: 0.5rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+          color: white;
+        }
+        .pricing-btn.free {
+          background-color: #4F46E5;
+        }
+        .pricing-btn.business {
+          background-color: #FF7F11;
+        }
+        .pricing-btn.enterprise {
+          background-color: #10B981;
+        }
+        .pricing-btn:hover {
+          opacity: 0.9;
+        }
+
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: #1F2A44;
+  border: 1px solid #2D3748;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.comparison-table th,
+.comparison-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #2D3748;
+}
+
+.comparison-table th {
+  color: #E5E7EB;
+  font-weight: 600;
+}
+
+.comparison-table td {
+  color: white;
+}
+
+.feature-name {
+  font-weight: 500;
+}
+
+.check-icon {
+  color: #10B981;
+  margin-right: 0.5rem;
+}
+.brown-icon {
+  color: #FF7F11;
+  margin-right: 0.5rem;
+}
+.cross-icon {
+  color: #4F46E5;
+  margin-right: 0.5rem;
+}
+
+/* Style for /day text */
+.comparison-table td span {
+  color: #9CA3AF; /* Light gray color */
+}
+        /* Footer Styles */
+        footer {
+          background-color: #0D1B2A;
+          color: #9CA3AF;
+          padding: 2rem 0;
+          border-top: 1px solid #1F2A44;
+        }
+        .footer-content {
+          display: flex;
+          flex-direction: column;
+          gap: 2rem;
+        }
+        @media (min-width: 768px) {
+          .footer-content {
+            flex-direction: row;
+            justify-content: space-between;
+          }
+        }
+        .footer-column {
+          flex: 1;
+        }
+        .footer-title {
+          color: white;
+          font-weight: 600;
+          margin-bottom: 1rem;
+        }
+        .footer-links {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+        .footer-links a {
+          color: #FF7F11;
+          text-decoration: none;
+          transition: color 0.3s;
+        }
+        .footer-links a:hover {
+          color: #e6710f;
+        }
+        .social-icons {
+          display: flex;
+          gap: 1rem;
+        }
+        .social-icons a {
+          color: #FF7F11;
+          font-size: 1.5rem;
+          transition: color 0.3s;
+        }
+        .social-icons a:hover {
+          color: #e6710f;
+        }
+        .footer-divider {
+          height: 1px;
+          background-color: #2D3748;
+          margin: 2rem 0;
+        }
+        .footer-bottom {
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        @media (min-width: 768px) {
+          .footer-bottom {
+            flex-direction: row;
+            justify-content: space-between;
+          }
+        }
+        .copyright {
+          font-size: 0.875rem;
+          color: #9CA3AF;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+          .hero-section {
+            padding: 2rem 0 1rem;
+          }
+          .hero-section h1 {
+            font-size: 2rem;
+          }
+          .hero-section p {
+            font-size: 1rem;
+          }
+          .section-title {
+            font-size: 1.75rem;
+          }
+          .section-divider,
+          .section-divider-thick,
+          .section-divider-dots {
+            width: 90%;
+          }
+        }
+        .btn-link {
+  display: inline-block;
+  text-decoration: none;
+}
+    </style>
+</head>
+<body>
+<!-- Header -->
+<header>
+    <img src="https://www.rankhero.com/static/images/rankhero-logo.svg" alt="KdpCheck Logo"
+         height="32">
+    <nav>
+        <a href="#tools-section">Shop Tools</a>
+        <a href="#footer">Contact</a>
+    </nav>
+    <div class="account-buttons">
+        {% if current_user.is_authenticated %}
+        <a href="{{ url_for('auth.logout') }}" class="btn-primary">Logout</a>
+        {% else %}
+        <a href="{{ url_for('auth.register') }}" class="btn-primary">Sign Up</a>
+        <a href="{{ url_for('auth.login') }}" class="btn-secondary">Login</a>
+        {% endif %}
+    </div>
+</header><!-- Hero Section -->
+<section class="hero-section" id="hero-section">
+    <div class="container">
+        <div class="hero-content">
+            <div class="hero-text">
+                <h1>KdpCheck</h1>
+                <h2>Your all-in-one toolkit to optimize listings, master SEO, and skyrocket Kdp sales</h2>
+                <p>Shops see 3x faster growth with KdpCheck</p>
+                <div class="hero-buttons">
+                    <a href="#tools-section" class="btn-secondary btn-link">Try Tools</a>
+                </div>
+                <p style="font-size: 0.875rem;">No Credit Card Required.</p>
+            </div>
+            <div class="hero-image">
+                <img src="https://www.rankhero.com/static/images/landing6.svg " alt="Growth Comparison Graph">
+            </div>
+        </div>
+    </div>
+</section>
+<!-- Tools Section -->
+<section class="tools-section" id="tools-section">
+    <div class="container">
+        <h2 class="section-title">Tools</h2>
+
+        <!-- Generator Tools -->
+        <h3 class="text-xl font-bold text-white mb-4 mt-8">Generator Tools</h3>
+        <div class="tools-grid">
+            <a href="{{ url_for('generator.title_generator') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-heading"></i></div>
+                <h3 class="tool-name">Title Generator</h3>
+                <p class="tool-desc">Generate optimized Kdp titles for your product</p>
+            </a>
+            <a href="{{ url_for('generator.subtitle_generator') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-text-width"></i></div>
+                <h3 class="tool-name">Subtitle Generator</h3>
+                <p class="tool-desc">Generate optimized subtitles for your Kdp listings</p>
+            </a>
+            <a href="{{ url_for('generator.description_generator') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-align-left"></i></div>
+                <h3 class="tool-name">Description Generator</h3>
+                <p class="tool-desc">Create compelling product descriptions optimized for Kdp SEO</p>
+            </a>
+            <a href="{{ url_for('generator.author_name_generator') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-user"></i></div>
+                <h3 class="tool-name">Author Name Generator</h3>
+                <p class="tool-desc">Generate creative names for your shop or author profile</p>
+            </a>
+        </div>
+
+        <!-- Research -->
+        <h3 class="text-xl font-bold text-white mb-4 mt-8">Research</h3>
+        <div class="tools-grid">
+            <a href="{{ url_for('research.keyword_research') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-hashtag"></i></div>
+                <h3 class="tool-name">Keyword Research</h3>
+                <p class="tool-desc">Find the best keywords to boost your Kdp SEO</p>
+            </a>
+
+            <a href="{{ url_for('research.category_finder') }}" class="tool-card">
+                <div class="tool-icon"><i class="fas fa-folder-open"></i></div>
+                <h3 class="tool-name">Category Finder</h3>
+                <p class="tool-desc">Find the right category for your product listing</p>
+            </a>
+        </div>
+
+        <!-- Planning Tools -->
+        <h3 class="text-xl font-bold text-white mb-4 mt-8">Planning Tools</h3>
+        <div class="tools-grid">
+            <a href="{{ url_for('planning_tools.royalty_calculator') }}" class="tool-card">
+            <div class="tool-icon"><i class="fas fa-calculator"></i></div>
+                <h3 class="tool-name">Royalty Calculator</h3>
+                <p class="tool-desc">Estimate your profits based on costs and sales</p>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer id="footer">
+    <div class="container">
+        <div class="footer-content">
+            <div class="footer-column">
+                <h4 class="footer-title">Made for Kdp Sellers</h4>
+                <p>Made with love for Kdp sellers by Kdp sellers</p>
+                <p><a href="mailto:support@Kdpcheck.com">support@Kdpcheck.com</a></p>
+            </div>
+            <div class="footer-column">
+                <h4 class="footer-title">Quick Links</h4>
+                <div class="footer-links">
+                    <a href="#">Home</a>
+                    <a href="#">Tools</a>
+                    <a href="#">Pricing</a>
+                    <a href="#">About</a>
+                    <a href="#">Blog</a>
+                    <a href="#">Contact</a>
+                </div>
+            </div>
+            <div class="footer-column">
+                <h4 class="footer-title">Around the Web</h4>
+                <div class="social-icons">
+                    <a href="#"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#"><i class="fab fa-twitter"></i></a>
+                    <a href="#"><i class="fab fa-instagram"></i></a>
+                    <a href="#"><i class="fab fa-pinterest"></i></a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-divider"></div>
+        <div class="footer-bottom">
+            <div>
+                <p class="copyright">
+                    The term 'Kdp' is a trademark of Kdp, Inc. This application uses the Kdp API but is not endorsed
+                    or certified by Kdp.
+                </p>
+            </div>
+            <div>
+                <p class="copyright">Copyright © KdpCheck 2020-2023. All rights reserved.</p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- Font Awesome Script -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+</body>
+</html>
+==================================================
+
+=== File: app\templates\planning_tools\royalty_calculator.html ===
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-3xl font-bold text-white mb-6">KDP Royalty Calculator</h1>
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+
+    <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+    <!-- Book Type -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">Book Type</label>
+        <select name="book_type" class="input-field w-full" required>
+            <option value="paperback" {% if selected_book_type == 'paperback' %}selected{% endif %}>Paperback</option>
+            <option value="hardcover" {% if selected_book_type == 'hardcover' %}selected{% endif %}>Hardcover</option>
+        </select>
+
+    </div>
+
+    <!-- Interior Type -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">Interior Type</label>
+        <select name="interior_type" class="input-field w-full" required>
+            <option value="black_white" {% if selected_interior_type == 'black_white' %}selected{% endif %}>Black & White</option>
+            <option value="premium_color" {% if selected_interior_type == 'premium_color' %}selected{% endif %}>Premium Color</option>
+            <option value="standard_color" {% if selected_interior_type == 'standard_color' %}selected{% endif %}>Standard Color</option>
+        </select>
+
+    </div>
+
+    <!-- Marketplace -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">Marketplace</label>
+
+        <select name="marketplace" class="input-field w-full" required>
+            <option value="Amazon.com" {% if selected_marketplace == 'Amazon.com' %}selected{% endif %}>Amazon.com (USD)</option>
+            <option value="Amazon.co.uk" {% if selected_marketplace == 'Amazon.co.uk' %}selected{% endif %}>Amazon.co.uk (GBP)</option>
+            <option value="Amazon.de" {% if selected_marketplace == 'Amazon.de' %}selected{% endif %}>Amazon.de (EUR)</option>
+            <option value="Amazon.fr" {% if selected_marketplace == 'Amazon.fr' %}selected{% endif %}>Amazon.fr (EUR)</option>
+            <option value="Amazon.es" {% if selected_marketplace == 'Amazon.es' %}selected{% endif %}>Amazon.es (EUR)</option>
+            <option value="Amazon.it" {% if selected_marketplace == 'Amazon.it' %}selected{% endif %}>Amazon.it (EUR)</option>
+            <option value="Amazon.nl" {% if selected_marketplace == 'Amazon.nl' %}selected{% endif %}>Amazon.nl (EUR)</option>
+            <option value="Amazon.ca" {% if selected_marketplace == 'Amazon.ca' %}selected{% endif %}>Amazon.ca (CAD)</option>
+            <option value="Amazon.com.au" {% if selected_marketplace == 'Amazon.com.au' %}selected{% endif %}>Amazon.com.au (AUD)</option>
+            <option value="Amazon.co.jp" {% if selected_marketplace == 'Amazon.co.jp' %}selected{% endif %}>Amazon.co.jp (JPY)</option>
+            <option value="Amazon.pl" {% if selected_marketplace == 'Amazon.pl' %}selected{% endif %}>Amazon.pl (PLN)</option>
+            <option value="Amazon.se" {% if selected_marketplace == 'Amazon.se' %}selected{% endif %}>Amazon.se (SEK)</option>
+        </select>
+
+
+    </div>
+
+    <!-- Trim Size -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">Trim Size</label>
+        <select name="trim_size" class="input-field w-full" required>
+            <option value="5x8" {% if selected_trim_size == '5x8' %}selected{% endif %}>5 x 8 (12.85 x 20.32 cm)</option>
+            <option value="5.25x8" {% if selected_trim_size == '5.25x8' %}selected{% endif %}>5.25 x 8 (13.34 x 20.32 cm)</option>
+            <option value="5.5x8.5" {% if selected_trim_size == '5.5x8.5' %}selected{% endif %}>5.5 x 8.5 (13.97 x 21.59 cm)</option>
+            <option value="6x9" {% if selected_trim_size == '6x9' %}selected{% endif %}>6 x 9 (15.24 x 22.86 cm)</option>
+            <option value="6.14x9.21" {% if selected_trim_size == '6.14x9.21' %}selected{% endif %}>6.14 x 9.21 (15.6 x 23.39 cm)</option>
+            <option value="6.69x9.61" {% if selected_trim_size == '6.69x9.61' %}selected{% endif %}>6.69 x 9.61 (17.0 x 24.4 cm)</option>
+            <option value="7x10" {% if selected_trim_size == '7x10' %}selected{% endif %}>7 x 10 (17.78 x 25.4 cm)</option>
+            <option value="7.44x9.69" {% if selected_trim_size == '7.44x9.69' %}selected{% endif %}>7.44 x 9.69 (18.9 x 24.61 cm)</option>
+            <option value="7.5x9.25" {% if selected_trim_size == '7.5x9.25' %}selected{% endif %}>7.5 x 9.25 (19.05 x 23.5 cm)</option>
+            <option value="8x10" {% if selected_trim_size == '8x10' %}selected{% endif %}>8 x 10 (20.32 x 25.4 cm)</option>
+            <option value="8.25x6" {% if selected_trim_size == '8.25x6' %}selected{% endif %}>8.25 x 6 (20.96 x 15.24 cm)</option>
+            <option value="8.25x8.25" {% if selected_trim_size == '8.25x8.25' %}selected{% endif %}>8.25 x 8.25 (20.96 x 20.96 cm)</option>
+            <option value="8.25x11" {% if selected_trim_size == '8.25x11' %}selected{% endif %}>8.25 x 11 (20.96 x 27.94 cm)</option>
+            <option value="8.5x8.5" {% if selected_trim_size == '8.5x8.5' %}selected{% endif %}>8.5 x 8.5 (21.59 x 21.59 cm)</option>
+            <option value="8.5x11" {% if selected_trim_size == '8.5x11' %}selected{% endif %}>8.5 x 11 (21.59 x 27.94 cm)</option>
+            <option value="8.27x11.69" {% if selected_trim_size == '8.27x11.69' %}selected{% endif %}>8.27 x 11.69 (21 x 29.7 cm)</option>
+        </select>
+
+    </div>
+
+    <!-- Page Count -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">Page Count</label>
+        <input type="number" name="page_count" class="input-field w-full" min="24" max="828"
+               value="{{ input_page_count }}">
+
+    </div>
+    
+    <!-- List Price -->
+    <div>
+        <label class="block text-sm text-gray-400 mb-1">List Price</label>
+        <input type="number" step="0.01" name="list_price" class="input-field w-full"
+               value="{{ input_list_price }}">
+
+    </div>
+
+    <!-- Submit -->
+    <div class="md:col-span-2">
+        <button type="submit" class="btn-primary w-full">Calculate Royalty</button>
+    </div>
+</form>
+
+</div>
+{% if error_message %}
+<div class="bg-red-600 text-white p-3 rounded mb-4">
+    {{ error_message }}
+</div>
+{% endif %}
+
+{% if royalty_table %}
+<div class="bg-[#232946] rounded-lg p-6 mt-8 overflow-x-auto">
+    <table class="w-full text-left text-sm">
+        <thead>
+        <tr class="border-b border-[#2D3748] text-white">
+            <th class="py-2 px-3">Marketplace</th>
+            <th class="py-2 px-3">List Price</th>
+            <th class="py-2 px-3">Royalty Rate</th>
+            <th class="py-2 px-3">Minimum List Price</th>
+            <th class="py-2 px-3">Printing Cost</th>
+            <th class="py-2 px-3">Estimated Royalty</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for row in royalty_table %}
+        <tr class="border-b border-[#2D3748] text-gray-300">
+            <td class="py-2 px-3">{{ row.marketplace }}</td>
+            <td class="py-2 px-3">{{ row.list_price }}</td>
+            <td class="py-2 px-3">{{ row.royalty_rate }}</td>
+            <td class="py-2 px-3">{{ row.min_price }}</td>
+            <td class="py-2 px-3">{{ row.printing_cost }}</td>
+            <td class="py-2 px-3">{{ row.estimated_royalty }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\plans\plans.html ===
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-white mb-8">Subscription Plans</h1>
+
+    {% if user_plan and current_plan %}
+    <div class="bg-[#1F2A44] rounded-lg p-6 mb-8">
+        <h2 class="text-xl font-semibold text-white mb-4">Your Current Plan</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+                <p class="text-gray-400">Plan:</p>
+                <p class="text-white font-medium">{{ current_plan.name }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400">Expires:</p>
+                <p class="text-white font-medium">{{ user_plan.end_date.strftime('%Y-%m-%d') }}</p>
+            </div>
+            <div>
+                <p class="text-gray-400">Status:</p>
+                <p class="text-white font-medium">
+                    <span class="{% if user_plan.is_active %}text-green-400{% else %}text-red-400{% endif %}">
+                        {% if user_plan.is_active %}Active{% else %}Expired{% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+
+        <form action="{{ url_for('plans.cancel_plan') }}" method="post" class="mt-4">
+            <button type="submit" class="btn-outline-plan">Cancel Subscription</button>
+        </form>
+        <form action="{{ url_for('plans.refund_plan') }}" method="post" class="mt-4">
+            <button type="submit" class="btn-outline-plan">Rfund</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {% for plan in plans %}
+        <div class="bg-[#1F2A44] rounded-lg overflow-hidden shadow-lg
+            {% if plan.is_popular %}border-2 border-[#FF7F11] transform scale-105{% endif %}">
+            <div class="p-6">
+                <h3 class="text-2xl font-bold text-white mb-2">{{ plan.name }}</h3>
+                <p class="text-gray-400 mb-4">{{ plan.price|round(2) }} $ / month</p>
+
+                {% if user_plan and plan.id == user_plan.plan_id %}
+                <button type="button"
+                        class="w-full bg-gray-500 text-white font-bold py-3 px-4 rounded transition-none"
+                        disabled
+                        style="cursor: default; opacity: 0.7; pointer-events: none;">
+                    Current Plan
+                </button>
+                {% elif plan.name == "Pro" and user_plan and user_plan.plan_id == free_plan.id %}
+                <button type="button"
+                        class="w-full bg-[#FF7F11] text-white font-bold py-3 px-4 rounded transition-none"
+                        onclick="window.location.href='/stripe/create-payment-link/{{ plan.id }}'">
+                    Upgrade Now
+                </button>
+                {% elif plan.name == "Free" and user_plan and user_plan.plan_id != free_plan.id %}
+                <button type="button"
+                        class="w-full bg-blue-500 text-white font-bold py-3 px-4 rounded transition-none"
+                        onclick="window.location.href='/stripe/create-payment-link/{{ plan.id }}'">
+                    Back to Free
+                </button>
+                {% else %}
+                <button type="button"
+                        class="w-full bg-[#FF7F11] text-white font-bold py-3 px-4 rounded transition-none"
+                        onclick="window.location.href='/stripe/create-payment-link/{{ plan.id }}'">
+                    Choose Plan
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+==================================================
+
+=== File: app\templates\research\category_finder.html ===
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-3xl font-bold text-white mb-6">Category Finder</h1>
+
+<form method="GET" class="flex flex-col md:flex-row gap-4 mb-8">
+    <input type="text" name="q" placeholder="Enter keyword or category..."
+           class="input-field flex-1" value="{{ search_query }}">
+    <button type="submit" class="btn-primary">Search</button>
+</form>
+
+{% if search_query and categories %}
+<h2 class="text-lg font-semibold text-white mb-4">
+    Search for "<span class="text-primary">{{ search_query }}</span>" found {{ total_found }} categories
+</h2>
+{% endif %}
+
+{% if categories %}
+<div class="overflow-x-auto bg-[#1A2238] border border-[#2D3748] rounded-md">
+    <table class="min-w-full text-sm text-white">
+        <thead class="bg-[#1F2A44] text-[#A0AEC0] text-xs uppercase">
+        <tr>
+            <th class="px-5 py-3 text-left font-medium">Category Name</th>
+            <th class="px-5 py-3 text-left font-medium">Category Path</th>
+        </tr>
+        </thead>
+        <tbody class="divide-y divide-[#2D3748]">
+        {% for cat in categories %}
+        <tr class="hover:bg-[#27324D] transition">
+            <td class="px-5 py-4">{{ cat.name }}</td>
+            <td class="px-5 py-4 text-gray-300">{{ cat['Category Path'] }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_found > per_page %}
+<div class="mt-4 flex justify-between items-center text-sm text-gray-400">
+    <div>
+        Showing <span class="showing-end">{{ categories|length + (page - 1) * per_page }}</span> of
+        <span class="showing-total">{{ total_found }}</span> entries
+    </div>
+
+    <div class="flex items-center space-x-2">
+        {% set current_page = page %}
+        {% set total_pages = (total_found // per_page) + (1 if total_found % per_page > 0 else 0) %}
+        {% if current_page > 1 %}
+        <a href="{{ url_for('research.category_finder', q=search_query, page=current_page - 1) }}"
+           class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">← Back</a>
+        {% else %}
+        <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">← Back</span>
+        {% endif %}
+
+        <span class="px-3 py-1 text-white font-bold">{{ current_page }}</span>
+
+        {% if current_page < total_pages %}
+        <a href="{{ url_for('research.category_finder', q=search_query, page=current_page + 1) }}"
+           class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">Next →</a>
+        {% else %}
+        <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">Next →</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% elif search_query %}
+<p class="text-gray-400 mt-4">No categories found for "<strong>{{ search_query }}</strong>"</p>
+{% endif %}
+
+{% endblock %}
+==================================================
+
+=== File: app\templates\research\keyword_research.html ===
+{% extends "base.html" %}
+{% block content %}
+<!-- Header Section -->
+<header class="mb-8">
+    <h1 class="text-3xl font-bold text-white mb-2">Keyword Research</h1>
+    <p class="text-gray-300">Search for keywords and analyze competition for Amazon KDP</p>
+</header>
+
+<!-- Main Card -->
+<div class="bg-[#1F2A44] p-6 rounded-lg shadow-lg">
+    <form method="POST" action="/keyword-research" class="flex flex-wrap gap-4 items-center">
+        <div class="flex-1 min-w-[200px]">
+            <label for="keyword" class="block text-sm font-medium mb-1">Keyword</label>
+            <input type="text" id="keyword" name="keyword" required placeholder="e.g. Coloring Book for Kids"
+                   class="input-field w-full">
+        </div>
+
+        <div class="flex-1 min-w-[180px]">
+            <label for="language" class="block text-sm font-medium mb-1">Language</label>
+            <select id="language" name="language" class="input-field w-full">
+                <option value="en">English</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+                <option value="ar">Arabic</option>
+            </select>
+        </div>
+
+        <div class="flex-1 min-w-[220px]">
+            <label for="country" class="block text-sm font-medium mb-1">Country</label>
+            <select id="country" name="country" class="input-field w-full text-sm leading-tight">
+                <option value="US">United States | amazon.com</option>
+                <option value="UK">United Kingdom | amazon.co.uk</option>
+                <option value="DE">Germany | amazon.de</option>
+                <option value="FR">France | amazon.fr</option>
+                <option value="CA">Canada | amazon.ca</option>
+                <option value="ES">Spain | amazon.es</option>
+                <option value="IT">Italy | amazon.it</option>
+                <option value="JP">Japan | amazon.co.jp</option>
+                <option value="IN">India | amazon.in</option>
+            </select>
+        </div>
+
+        <div class="flex items-end">
+            <button type="submit" class="btn-primary">Search</button>
+        </div>
+    </form>
+</div>
+
+{% if results %}
+<div class="mt-8 w-full">
+
+    <!-- البحث + الأزرار -->
+    <div>
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-lg font-semibold text-white">
+                Search for "<span class="text-primary">{{ keyword }}</span>" found {{ total_results }} keywords
+            </h2>
+
+            <div class="flex space-x-3">
+                <button onclick="copy()"
+                        class="px-4 py-2 bg-[#1F2A44] text-white rounded hover:bg-[#2D3748] text-sm flex items-center">
+                    <i class="fas fa-copy mr-1"></i> Copy
+                </button>
+                <button onclick="exportToCSV()"
+                        class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm flex items-center">
+                    <i class="fas fa-file-export mr-1"></i> Export to CSV
+                </button>
+            </div>
+        </div>
+
+        <!-- جدول البيانات -->
+        <div class="mt-6 overflow-x-auto sticky-container">
+            <table class="min-w-full border border-[#2D3748] rounded-md text-sm text-[#E0E0E0]">
+                <thead class="bg-[#1F2A44]">
+                <tr>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[40px]">
+                        <input type="checkbox" id="chkAll"/>
+                    </th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[30%]">Keywords</th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[12%]">Search Volume</th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[12%]">Competing books</th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[13%]">Books broadly related</th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[13%]">Competing authors</th>
+                    <th class="border border-[#2D3748] px-4 py-2 text-left w-[15%]">Median Monthly Sales</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in results %}
+                <tr class="hover:bg-[#2d3b58] transition">
+                    <td class="border border-[#2D3748] px-4 py-2 text-center">
+                        <input type="checkbox" class="chkItem"/>
+                    </td>
+                    <td class="border border-[#2D3748] px-4 py-2 flex items-center space-x-2">
+                        <span class="break-words whitespace-normal">{{ row.keyword }}</span>
+                        <a href="https://www.amazon.com/s?k={{ row.keyword | urlencode }}" target="_blank"
+                           title="Search on Amazon"
+                           class="text-primary hover:text-[#e6710f] transition">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none"
+                                 viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                      d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 1010.5 18a7.5 7.5 0 006.15-1.35z"/>
+                            </svg>
+                        </a>
+                    </td>
+
+                    <!-- Search Volume -->
+                    <td class="border border-[#2D3748] px-4 py-2">
+                        {% if row.search_volume %}
+                        {% if row.search_volume == 'Low' %}
+                        <span class="text-low">{{ row.search_volume }}</span>
+                        {% elif row.search_volume == 'Medium' %}
+                        <span class="text-medium">{{ row.search_volume }}</span>
+                        {% elif row.search_volume == 'High' %}
+                        <span class="text-high">{{ row.search_volume }}</span>
+                        {% else %}
+                        {{ row.search_volume }}
+                        {% endif %}
+                        {% else %}
+                        <span class="text-na">N/A</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Competing Books -->
+                    <td class="border border-[#2D3748] px-4 py-2">
+                        {% if row.competing_books %}
+                        {{ row.competing_books }}
+                        {% else %}
+                        <span class="text-na">N/A</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Books Broadly Related -->
+                    <td class="border border-[#2D3748] px-4 py-2">
+                        {% if row.books_broadly_related %}
+                        {{ row.books_broadly_related }}
+                        {% else %}
+                        <span class="text-na">N/A</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Competing Authors -->
+                    <td class="border border-[#2D3748] px-4 py-2">
+                        {% if row.competing_authors %}
+                        {{ row.competing_authors }}
+                        {% else %}
+                        <span class="text-na">N/A</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Median Monthly Sales -->
+                    <td class="border border-[#2D3748] px-4 py-2">
+                        {% if row.median_monthly_sales %}
+                        {{ row.median_monthly_sales }}
+                        {% else %}
+                        <span class="text-na">N/A</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="mt-4 flex justify-between items-center text-sm text-gray-400">
+            <div>
+                Showing <span class="showing-end">{{ end_index }}</span> of <span class="showing-total">{{ total_results }}</span>
+                entries
+            </div>
+
+            <div class="flex items-center space-x-2">
+                {% set current_page = request.args.get('page', 1) | int %}
+                {% set total_pages = total_pages %}
+
+                {% if current_page > 1 %}
+                <a href="?page={{ current_page - 1 }}"
+                   class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">← Back</a>
+                {% else %}
+                <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">← Back</span>
+                {% endif %}
+
+                <span class="px-3 py-1 text-white font-bold">{{ current_page }}</span>
+
+                {% if current_page < total_pages %}
+                <a href="?page={{ current_page + 1 }}"
+                   class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">Next →</a>
+                {% else %}
+                <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">Next →</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- JavaScript -->
+    <script>
+        // تحديد الكل
+        document.getElementById('chkAll').addEventListener('change', function () {
+            const checkboxes = document.querySelectorAll('.chkItem');
+            const checked = this.checked;
+            checkboxes.forEach(chk => chk.checked = checked);
+        });
+
+        // نسخ البيانات المحددة
+        function copy() {
+            const headers = ['Keyword', 'Search Volume', 'Competing Books', 'Books Broadly Related', 'Competing Authors', 'Median Monthly Sales'];
+            let textToCopy = headers.join('\t') + '\n';
+
+            const checkboxes = document.querySelectorAll('.chkItem:checked');
+
+            if (checkboxes.length === 0) {
+                alert('Please select at least one keyword.');
+                return;
+            }
+
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                const cols = row.querySelectorAll('td');
+                const rowData = [];
+
+                cols.forEach(col => {
+                    rowData.push(col.innerText.trim());
+                });
+
+                textToCopy += rowData.join('\t') + '\n';
+            });
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert('Selected data copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy: ', err);
+            });
+        }
+
+        // تصدير إلى CSV
+        function exportToCSV() {
+            const headers = ['Keyword', 'Search Volume', 'Competing Books', 'Books Broadly Related', 'Competing Authors', 'Median Monthly Sales'];
+            let csvContent = 'data:text/csv;charset=utf-8,' + headers.join(',') + '\n';
+
+            const rows = document.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cols = row.querySelectorAll('td');
+                const rowData = Array.from(cols).map(col => `"${col.innerText.trim().replace(/"/g, '""')}"`);
+                csvContent += rowData.join(',') + '\n';
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "keywords_export.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+
+</div>
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\research\trademark_search.html ===
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-3xl font-bold text-white mb-6">Trademark Search</h1>
+
+<form method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
+    <input type="text" name="keyword" placeholder="Enter trademark term"
+           class="input-field flex-1" value="{{ keyword }}">
+    <button type="submit" class="btn-primary">Search</button>
+</form>
+
+{% if keyword and total_found > 0 and results %}
+<h2 class="text-lg font-semibold text-white mb-4">
+    Search for "<span class="text-primary">{{ keyword }}</span>" found {{ total_found }} trademarks
+</h2>
+{% endif %}
+
+{% if results %}
+<div class="overflow-x-auto bg-[#1A2238] border border-[#2D3748] rounded-md">
+    <table class="min-w-full text-sm text-white">
+        <thead class="bg-[#1F2A44] text-[#A0AEC0] text-xs uppercase">
+        <tr>
+            <th class="px-5 py-3 text-left font-medium">Trademark</th>
+            <th class="px-5 py-3 text-left font-medium">Countries</th>
+            <th class="px-5 py-3 text-left font-medium">Granted</th>
+            <th class="px-5 py-3 text-left font-medium">Status</th>
+            <th class="px-5 py-3 text-left font-medium">Expires</th>
+        </tr>
+        </thead>
+        <tbody class="divide-y divide-[#2D3748]">
+        {% for r in results %}
+        <tr class="hover:bg-[#27324D] transition">
+            <td class="px-5 py-4">
+                <a href="{{ r.Link }}" target="_blank" class="flex items-center gap-3">
+                    {% if r.Image %}
+                    <img src="{{ r.Name_or_Image }}" alt="TM"
+                         class="w-12 h-12 object-contain bg-white p-1 rounded">
+                    {% else %}
+                    <div class="bg-[#0D1B2A] text-white font-bold text-base px-3 py-1 rounded shadow">
+                        {{ r.Name_or_Image }}
+                    </div>
+                    {% endif %}
+                </a>
+            </td>
+            <td class="px-5 py-4">
+                {% set first = r.Countries[0] if r.Countries else None %}
+                {% set rest = r.Countries[1:] %}
+                {% set all_countries = r.Countries | join(', ') %}
+                {% if first %}
+                {% set flag_code = first|lower if first|lower != 'uk' else 'gb' %}
+                <div class="flex items-center gap-2 {% if rest %}cursor-help{% endif %}"
+                     {% if rest %}title="{{ all_countries }}"{% endif %}>
+                    <img src="https://flagcdn.com/h20/{{ flag_code }}.png" alt="{{ first }}" class="h-4 w-6 rounded-sm">
+                    <span class="text-sm">{{ first }}</span>
+                    {% if rest %}
+                    <span class="text-xs text-gray-400">+{{ rest|length }}</span>
+                    {% endif %}
+                </div>
+                {% else %}
+                <span class="text-pink-400 italic">N/A</span>
+                {% endif %}
+            </td>
+            <td class="px-5 py-4">
+                {% if r.Granted %}{{ r.Granted }}
+                {% else %}<span class="text-pink-400 italic">N/A</span>{% endif %}
+            </td>
+            <td class="px-5 py-4 font-semibold">
+                {% if r.Status %}
+                <span class="{% if 'dead' in r.Status|lower %}text-red-500
+                             {% elif 'live' in r.Status|lower or 'active' in r.Status|lower or 'registered' in r.Status|lower %}
+                             text-green-400
+                             {% else %}text-gray-300{% endif %}">
+                    {{ r.Status }}
+                </span>
+                {% else %}
+                <span class="text-pink-400 italic">N/A</span>
+                {% endif %}
+            </td>
+            <td class="px-5 py-4">
+                {% if r.Status_Date %}{{ r.Status_Date }}
+                {% else %}<span class="text-pink-400 italic">N/A</span>{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_found > per_page %}
+<div class="mt-4 flex justify-between items-center text-sm text-gray-400">
+    <div>
+        Showing <span class="showing-end">{{ results|length + (page - 1) * per_page }}</span> of
+        <span class="showing-total">{{ total_found }}</span> entries
+    </div>
+
+    <div class="flex items-center space-x-2">
+        {% set current_page = page %}
+        {% set total_pages = (total_found // per_page) + (1 if total_found % per_page > 0 else 0) %}
+        {% set search_id = request.args.get('id') %}
+
+        {% if current_page > 1 %}
+        <a href="{{ url_for('research.trademark_search', keyword=keyword, id=search_id, page=current_page - 1) }}"
+           class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">← Back</a>
+        {% else %}
+        <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">← Back</span>
+        {% endif %}
+
+        <span class="px-3 py-1 text-white font-bold">{{ current_page }}</span>
+
+        {% if current_page < total_pages %}
+        <a href="{{ url_for('research.trademark_search', keyword=keyword, id=search_id, page=current_page + 1) }}"
+           class="px-3 py-1 border border-[#2D3748] text-white rounded hover:bg-[#1F2A44]">Next →</a>
+        {% else %}
+        <span class="px-3 py-1 border border-[#2D3748] text-gray-500 rounded cursor-not-allowed">Next →</span>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% elif keyword %}
+<p class="text-gray-400 mt-4">No results found for "<strong>{{ keyword }}</strong>"</p>
+{% endif %}
+
+{% endblock %}
+
+==================================================
+
+=== File: app\templates\research\trademark_view.html ===
+{% extends "base.html" %}
+{% block content %}
+
+<h1 class="text-3xl font-bold text-white mb-6">Trademark Search</h1>
+
+<form method="POST" class="flex flex-col md:flex-row gap-4 mb-8">
+    <input type="text" name="keyword" placeholder="Enter trademark term" class="input-field flex-1" value="{{ keyword }}">
+    <button type="submit" class="btn-primary">Search</button>
+</form>
+
+{% if results %}
+<div class="space-y-4">
+    {% for r in results %}
+    <div class="bg-[#1F2A44] rounded-lg shadow-md border border-[#2D3748] p-4 flex flex-col md:flex-row md:items-center md:gap-6">
+
+        <!-- الصورة -->
+        <div class="flex-shrink-0 mb-2 md:mb-0">
+            <a href="{{ r.Link }}" target="_blank">
+                {% if r.Image %}
+                <img src="{{ r.Name_or_Image }}" alt="TM" class="w-20 h-20 object-contain bg-white p-1 rounded">
+                {% else %}
+                <div class="text-white font-bold text-lg w-20 h-20 flex items-center justify-center bg-[#0D1B2A] rounded">
+                    {{ r.Name_or_Image }}
+                </div>
+                {% endif %}
+            </a>
+        </div>
+
+        <!-- باقي البيانات في صف أفقي -->
+        <div class="flex flex-wrap items-center gap-4 text-sm text-white">
+
+            <!-- الاسم (فقط إذا لم يكن صورة) -->
+            {% if not r.Image %}
+            <div>
+                <span class="text-gray-400 block">Name</span>
+                <span class="font-semibold">{{ r.Name_or_Image }}</span>
+            </div>
+            {% endif %}
+
+            <!-- الدول -->
+            <div>
+                <span class="text-gray-400 block">Countries</span>
+                <div class="flex flex-wrap gap-1 mt-1">
+                    {% for code in r.Countries %}
+                    <div class="flex items-center space-x-1 bg-[#0D1B2A] px-2 py-1 rounded text-xs border border-[#2D3748]">
+                        <img src="https://flagcdn.com/h20/{{ code|lower }}.png" alt="{{ code }}" class="h-4 w-6 rounded-sm">
+                        <span>{{ code }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Granted -->
+            <div>
+                <span class="text-gray-400 block">Granted</span>
+                <span>{{ r.Granted or 'N/A' }}</span>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <span class="text-gray-400 block">Status</span>
+                <span>{{ r.Status or 'N/A' }}</span>
+            </div>
+
+            <!-- Status Date -->
+            <div>
+                <span class="text-gray-400 block">Expires</span>
+                <span class="text-yellow-300 font-semibold">{{ r.Status_Date or 'N/A' }}</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% elif keyword %}
+<p class="text-gray-400 mt-4">No results found for "<strong>{{ keyword }}</strong>"</p>
+{% endif %}
+
+{% endblock %}
+
+==================================================
+
+=== File: app\utils\helpers.py ===
+
+==================================================
+

@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ site_name }} - {{ site_description }}{% endblock %}</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="{% block description %}{{ site_description }}{% endblock %}">
+    <meta name="keywords" content="{% if site_config.keywords %}{{ site_config.keywords }}{% else %}KDP tools, Amazon publishing, book marketing, title generator, keyword research, royalty calculator{% endif %}">
+    <meta name="author" content="{{ site_name }}">
+    
+    <!-- Favicon -->
+    {% if favicon_url %}
+    <link rel="icon" type="image/x-icon" href="{{ favicon_url }}">
+    {% endif %}
+    
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:title" content="{% block og_title %}{{ site_name }} - {{ site_description }}{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}{{ site_description }}{% endblock %}">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="{{ request.url }}">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <!-- Google Analytics -->
+    {% if google_analytics_id %}
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ google_analytics_id }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '{{ google_analytics_id }}');
+    </script>
+    {% endif %}
+    
+    <!-- Google Tag Manager -->
+    {% if google_tag_manager_id %}
+    <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','{{ google_tag_manager_id }}');</script>
+    {% endif %}
+    
+    <!-- Facebook Pixel -->
+    {% if facebook_pixel_id %}
+    <script>
+      !function(f,b,e,v,n,t,s)
+      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+      n.queue=[];t=b.createElement(e);t.async=!0;
+      t.src=v;s=b.getElementsByTagName(e)[0];
+      s.parentNode.insertBefore(t,s)}(window, document,'script',
+      'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '{{ facebook_pixel_id }}');
+      fbq('track', 'PageView');
+    </script>
+    <noscript><img height="1" width="1" style="display:none"
+      src="https://www.facebook.com/tr?id={{ facebook_pixel_id }}&ev=PageView&noscript=1"
+    /></noscript>
+    {% endif %}
+    
+    <!-- Custom Head Tags -->
+    {% if custom_head_tags %}
+    {{ custom_head_tags|safe }}
+    {% endif %}
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <!-- Google Tag Manager (noscript) -->
+    {% if google_tag_manager_id %}
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ google_tag_manager_id }}"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    {% endif %}
+    <!-- Navigation - Show only on non-tools pages -->
+    {% if not (current_user.is_authenticated and request.endpoint and request.endpoint.startswith('tools.')) %}
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="/">
+                {% if logo_url %}
+                    <img src="{{ logo_url }}" alt="{{ site_name }}" style="height: 32px; margin-right: 8px;">
+                {% else %}
+                    <i class="fas fa-book-open me-2"></i>
+                {% endif %}
+                {{ site_name }}
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <!-- Navigation Links in Center -->
+                <ul class="navbar-nav mx-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('index') }}">{{ navigation_content.home or 'Home' }}</a>
+                    </li>
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('tools.dashboard') }}">{{ navigation_content.dashboard or 'Dashboard' }}</a>
+                        </li>
+                    {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('plans') }}">{{ navigation_content.plans or 'Plans' }}</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('contact') }}">{{ navigation_content.contact or 'Contact' }}</a>
+                    </li>
+                </ul>
+                
+                <!-- Auth Links -->
+                <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user-circle me-1"></i>{{ current_user.username }}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="openSettingsModal()">
+                                    <i class="fas fa-cog me-2"></i>Settings
+                                </a></li>
+                                <li><a class="dropdown-item" href="{{ url_for('google_auth.logout') }}">
+                                    <i class="fas fa-sign-out-alt me-2"></i>{{ button_texts.logout }}
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.login') }}">{{ button_texts.login }}</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('auth.register') }}">{{ button_texts.register }}</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Flash Messages for non-dashboard pages -->
+    {% if not (current_user.is_authenticated and request.endpoint and request.endpoint.startswith('tools.')) %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="container-fluid position-fixed" style="top: 70px; z-index: 1040;">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show auto-dismiss-alert" role="alert" data-auto-dismiss="true">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    {% endif %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="content-layout">
+            {% if current_user.is_authenticated and request.endpoint and request.endpoint.startswith('tools.') %}
+                <!-- Tool pages layout with sidebar -->
+                <div class="container-fluid">
+                    <div class="row">
+                        <!-- Sidebar -->
+                        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse d-flex flex-column">
+                            <!-- Scrollable content area -->
+                            <div class="sidebar-content flex-grow-1 overflow-auto sidebar-scroll-area">
+                                <ul class="nav flex-column px-3">
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if request.endpoint == 'tools.dashboard' %}active{% endif %}" href="{{ url_for('tools.dashboard') }}">
+                                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                                        </a>
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Generation Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.title_generator' %}active{% endif %}" href="{{ url_for('tools.title_generator') }}">
+                                                <i class="fas fa-heading me-2"></i>Title Generator
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-heading me-2"></i>Title Generator
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.subtitle_generator' %}active{% endif %}" href="{{ url_for('tools.subtitle_generator') }}">
+                                                <i class="fas fa-text-height me-2"></i>Subtitle Generator
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-text-height me-2"></i>Subtitle Generator
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.description_generator' %}active{% endif %}" href="{{ url_for('tools.description_generator') }}">
+                                                <i class="fas fa-align-left me-2"></i>Description Generator
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-align-left me-2"></i>Description Generator
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.author_generator' %}active{% endif %}" href="{{ url_for('tools.author_generator') }}">
+                                                <i class="fas fa-user-edit me-2"></i>Author Generator
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-user-edit me-2"></i>Author Generator
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Research Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.keyword_research' %}active{% endif %}" href="{{ url_for('tools.keyword_research') }}">
+                                                <i class="fas fa-search me-2"></i>Keyword Research
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-search me-2"></i>Keyword Research
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.category_finder' %}active{% endif %}" href="{{ url_for('tools.category_finder') }}">
+                                                <i class="fas fa-tags me-2"></i>Category Finder
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-tags me-2"></i>Category Finder
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.trademark_search' %}active{% endif %}" href="{{ url_for('tools.trademark_search') }}">
+                                                <i class="fas fa-shield-alt me-2"></i>Trademark Search
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-shield-alt me-2"></i>Trademark Search
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Business Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        {% if current_user.email_verified %}
+                                            <a class="nav-link {% if request.endpoint == 'tools.royalty_calculator' %}active{% endif %}" href="{{ url_for('tools.royalty_calculator') }}">
+                                                <i class="fas fa-calculator me-2"></i>Royalty Calculator
+                                            </a>
+                                        {% else %}
+                                            <span class="nav-link disabled-tool" onclick="showVerificationNotice()">
+                                                <i class="fas fa-calculator me-2"></i>Royalty Calculator
+                                                <i class="fas fa-lock ms-auto"></i>
+                                            </span>
+                                        {% endif %}
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Account</h6>
+                                    
+                                    <li class="nav-item">
+                                        <a class="nav-link {% if request.endpoint == 'tools.settings' %}active{% endif %}" href="{{ url_for('tools.settings') }}">
+                                            <i class="fas fa-cog me-2"></i>Settings
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </nav>
+                        
+                        <!-- Fixed header section at top - outside nav -->
+                        <div class="sidebar-header-fixed bg-dark border-bottom border-secondary p-3">
+                            <a href="{{ url_for('index') }}" class="text-decoration-none">
+                                <h4 class="text-white mb-0">
+                                    {% if logo_url %}
+                                        <img src="{{ logo_url }}" alt="{{ site_name }}" style="height: 28px; margin-right: 8px;">
+                                    {% else %}
+                                        <i class="fas fa-book-open me-2"></i>
+                                    {% endif %}
+                                    {{ site_name }}
+                                </h4>
+                            </a>
+                        </div>
+                        
+                        <!-- Fixed user section at bottom - outside nav -->
+                        {% if current_user.is_authenticated %}
+                            <div class="sidebar-user-fixed bg-dark border-top p-3">
+                                <div class="dropdown dropup">
+                                    <a class="nav-link d-flex align-items-center text-light" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fas fa-user-circle me-2"></i>
+                                        <span>{{ current_user.first_name if current_user.first_name else current_user.username }}</span>
+                                    </a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" href="{{ url_for('tools.settings') }}">
+                                            <i class="fas fa-cog me-2"></i>Settings
+                                        </a></li>
+                                        <li><a class="dropdown-item" href="{{ url_for('google_auth.logout') }}">
+                                            <i class="fas fa-sign-out-alt me-2"></i>Log out
+                                        </a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <!-- Main content area for tools -->
+                        <div class="col-md-9 ms-sm-auto col-lg-10 px-md-4 pt-0">
+                            {% block tool_content %}{% endblock %}
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <!-- Regular layout for non-tool pages -->
+                <div class="regular-content-area">
+                    {% block content %}{% endblock %}
+                </div>
+            {% endif %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-light py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5><i class="fas fa-book-open me-2"></i>{{ site_name }}</h5>
+                    <p class="text-muted">{{ site_config.footer_description or 'Your complete toolkit for Amazon KDP publishing success.' }}</p>
+                </div>
+                <div class="col-md-3">
+                    <h6>{{ footer_content.quick_links.title or 'Quick Links' }}</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="{{ url_for('plans') }}" class="text-muted text-decoration-none">{{ footer_content.quick_links.links[0] or 'Pricing Plans' }}</a></li>
+                        <li><a href="{{ url_for('contact') }}" class="text-muted text-decoration-none">{{ footer_content.quick_links.links[1] or 'Contact Support' }}</a></li>
+                        {% if current_user.is_authenticated %}
+                            <li><a href="{{ url_for('tools.dashboard') }}" class="text-muted text-decoration-none">{{ footer_content.quick_links.links[2] or 'Dashboard' }}</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="col-md-3">
+                    <h6>{{ footer_content.tools.title or 'Tools' }}</h6>
+                    <ul class="list-unstyled">
+                        <li><span class="text-muted">{{ footer_content.tools.items[0] or 'Title Generator' }}</span></li>
+                        <li><span class="text-muted">{{ footer_content.tools.items[1] or 'Keyword Research' }}</span></li>
+                        <li><span class="text-muted">{{ footer_content.tools.items[2] or 'Royalty Calculator' }}</span></li>
+                        <li><span class="text-muted">{{ footer_content.tools.items[3] or 'And more...' }}</span></li>
+                    </ul>
+                </div>
+            </div>
+            <hr class="my-4">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <p class="text-muted mb-0">{{ footer_content.copyright or '© 2024 ' + site_name + '. All rights reserved.' }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <div class="social-links mb-2">
+                        {% if site_config and site_config.facebook_url %}
+                            <a href="{{ site_config.facebook_url }}" class="text-muted me-3" target="_blank" rel="noopener">
+                                <i class="fab fa-facebook-f"></i>
+                            </a>
+                        {% endif %}
+                        {% if site_config and site_config.twitter_url %}
+                            <a href="{{ site_config.twitter_url }}" class="text-muted me-3" target="_blank" rel="noopener">
+                                <i class="fab fa-twitter"></i>
+                            </a>
+                        {% endif %}
+                        {% if site_config and site_config.instagram_url %}
+                            <a href="{{ site_config.instagram_url }}" class="text-muted me-3" target="_blank" rel="noopener">
+                                <i class="fab fa-instagram"></i>
+                            </a>
+                        {% endif %}
+                        {% if site_config and site_config.linkedin_url %}
+                            <a href="{{ site_config.linkedin_url }}" class="text-muted me-3" target="_blank" rel="noopener">
+                                <i class="fab fa-linkedin-in"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">{{ site_config.footer_tagline or 'Made for Amazon KDP Publishers' }}</small>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    
+    <script>
+    function showVerificationNotice() {
+        const toast = document.createElement('div');
+        toast.className = 'toast-notification toast-warning';
+        toast.innerHTML = `
+            <div class="toast-content">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Please verify your email address to access tools.
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 3000);
+    }
+
+    function showFlashMessage(message, category) {
+        const toast = document.createElement('div');
+        const iconClass = category === 'success' ? 'check-circle' : 
+                         category === 'warning' ? 'exclamation-triangle' : 
+                         category === 'error' ? 'times-circle' : 'info-circle';
+        const toastClass = category === 'error' ? 'toast-danger' : `toast-${category}`;
+        
+        toast.className = `toast-notification ${toastClass}`;
+        toast.innerHTML = `
+            <div class="toast-content">
+                <i class="fas fa-${iconClass} me-2"></i>
+                ${message}
+            </div>
+        `;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => toast.classList.add('show'), 100);
+        setTimeout(() => {
+            toast.classList.remove('show');
+            setTimeout(() => toast.remove(), 300);
+        }, 5000);
+    }
+
+
+    // Auto-dismiss flash messages after 5 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        // Show flash messages as toast notifications for dashboard pages
+        {% if current_user.is_authenticated and request.endpoint and request.endpoint.startswith('tools.') %}
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        showFlashMessage('{{ message|safe }}', '{{ category }}');
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        {% endif %}
+        
+        const autoDismissAlerts = document.querySelectorAll('.auto-dismiss-alert[data-auto-dismiss="true"]');
+        
+        autoDismissAlerts.forEach(function(alert) {
+            // Auto dismiss after 5 seconds
+            setTimeout(function() {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 5000);
+        });
+    });
+    </script>
+    
+    <style>
+    .toast-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        padding: 1rem 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        font-weight: 500;
+    }
+
+    .toast-notification.toast-warning {
+        background: #ffc107;
+        color: #000;
+    }
+
+    .toast-notification.toast-success {
+        background: #198754;
+        color: #fff;
+    }
+
+    .toast-notification.toast-danger {
+        background: #dc3545;
+        color: #fff;
+    }
+
+    .toast-notification.toast-info {
+        background: #0dcaf0;
+        color: #000;
+    }
+
+    .toast-notification.show {
+        transform: translateX(0);
+    }
+
+    .toast-content {
+        display: flex;
+        align-items: center;
+    }
+    
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    
+    /* Prevent background scrolling when modal is open */
+    .modal-open {
+        overflow: hidden !important;
+    }
+    
+    /* Enable scrolling only within modal content */
+    .modal-body {
+        overflow-y: auto !important;
+        max-height: calc(100vh - 200px) !important;
+    }
+    
+    /* Ensure modal backdrop prevents page interaction */
+    .modal-backdrop {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        z-index: 1040 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background-color: rgba(0, 0, 0, 0.5) !important;
+    }
+    
+    /* Modal positioning */
+    .modal {
+        overflow: hidden !important;
+    }
+    
+    .modal.fade .modal-dialog {
+        transition: transform 0.3s ease-out !important;
+    }
+    </style>
+    
+
+
+                        <div class="col-lg-10 col-md-9">
+                            <div class="tab-content" id="v-pills-tabContent">
+                                <!-- Account Settings Tab -->
+
+
+
+    <script>
+
+        function showSettings() {
+        }
+
+        function showChangeEmailForm() {
+            emailModal.show();
+        }
+
+        function showChangePasswordForm() {
+            passwordModal.show();
+        }
+
+        function showDeleteAccountForm() {
+            deleteModal.show();
+        }
+
+        function showCancelSubscriptionForm() {
+            // Implement subscription cancellation logic
+            alert('Subscription cancellation feature will be implemented');
+        }
+
+        async function saveAccountSettings() {
+            const settings = {
+                firstName: document.getElementById('firstName').value,
+                lastName: document.getElementById('lastName').value,
+                country: document.getElementById('country').value,
+                city: document.getElementById('city').value,
+                address1: document.getElementById('address1').value,
+                address2: document.getElementById('address2').value,
+                zipCode: document.getElementById('zipCode').value
+            };
+
+            try {
+                const response = await fetch('/tools/save-account-settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(settings)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (error) {
+                showToast('Error saving settings', 'error');
+            }
+        }
+
+
+
+
+        async function loadBillingHistory() {
+            const historyContainer = document.getElementById('billingHistory');
+            historyContainer.innerHTML = '<div class="text-center"><div class="spinner-border spinner-border-sm"></div> Loading...</div>';
+
+            try {
+                const response = await fetch('/tools/get-billing-history');
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    historyContainer.innerHTML = '<div class="text-center py-4"><i class="fas fa-file-invoice fa-2x text-muted mb-2"></i><div class="text-muted">No billing history available</div></div>';
+                } else {
+                    let html = '<div class="list-group list-group-flush">';
+                    data.forEach(item => {
+                        html += `
+                            <div class="list-group-item bg-transparent border-secondary">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-semibold">${item.description}</div>
+                                        <small class="text-muted">${item.date}</small>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="fw-bold">${item.amount}</div>
+                                        <span class="badge bg-${item.status === 'paid' ? 'success' : 'warning'}">${item.status}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    historyContainer.innerHTML = html;
+                }
+            } catch (error) {
+                historyContainer.innerHTML = '<div class="text-danger">Error loading billing history</div>';
+            }
+        }
+
+        // Calculate days remaining for subscription
+        document.addEventListener('DOMContentLoaded', function() {
+            {% if current_user.is_authenticated and current_user.subscription_end %}
+            const endDate = new Date('{{ current_user.subscription_end.isoformat() }}');
+            const startDate = new Date('{{ current_user.subscription_start.isoformat() if current_user.subscription_start else current_user.created_at.isoformat() }}');
+            const now = new Date();
+            const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+            const remainingDays = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+            
+            const daysElement = document.getElementById('daysRemaining');
+            const progressElement = document.getElementById('subscriptionProgress');
+            
+            if (daysElement && progressElement) {
+                if (remainingDays > 0) {
+                    const progressPercentage = Math.max(0, (remainingDays / totalDays) * 100);
+                    
+                    if (remainingDays > 30) {
+                        daysElement.innerHTML = `<span class="text-success">${remainingDays} days</span>`;
+                        progressElement.className = 'progress-bar bg-success';
+                    } else if (remainingDays > 7) {
+                        daysElement.innerHTML = `<span class="text-warning">${remainingDays} days</span>`;
+                        progressElement.className = 'progress-bar bg-warning';
+                    } else {
+                        daysElement.innerHTML = `<span class="text-danger">${remainingDays} days</span> <i class="fas fa-exclamation-triangle text-danger ms-1"></i>`;
+                        progressElement.className = 'progress-bar bg-danger';
+                    }
+                    
+                    progressElement.style.width = progressPercentage + '%';
+                    progressElement.setAttribute('aria-valuenow', progressPercentage);
+                } else {
+                    daysElement.innerHTML = '<span class="text-danger fw-bold">Expired</span> <i class="fas fa-times-circle text-danger ms-1"></i>';
+                    progressElement.className = 'progress-bar bg-danger';
+                    progressElement.style.width = '100%';
+                    progressElement.setAttribute('aria-valuenow', 0);
+                }
+            }
+            {% endif %}
+        });
+        
+        // Handle modal scroll behavior - removed since modals are no longer used
+    </script>
+</body></html>

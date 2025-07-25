@@ -1,0 +1,620 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Tools Management - Admin Panel{% endblock %}
+{% block page_title %}Tools Management{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Tools Management</h1>
+        <nav class="page-breadcrumb">
+            <span class="text-muted">Configuration / Tools Management</span>
+        </nav>
+    </div>
+    <div class="d-flex gap-2">
+        <button class="btn btn-warning" onclick="toggleMaintenanceMode()">
+            <i class="fas fa-tools me-2"></i>
+            {% if maintenance_info.is_enabled %}
+                Disable Maintenance
+            {% else %}
+                Enable Maintenance
+            {% endif %}
+        </button>
+        <button class="btn btn-success" onclick="saveAllToolsConfig()">
+            <i class="fas fa-save me-2"></i>Save All Changes
+        </button>
+    </div>
+</div>
+
+<!-- Maintenance Mode Status -->
+{% if maintenance_info.is_enabled %}
+<div class="alert alert-warning mb-4">
+    <div class="d-flex align-items-center">
+        <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+        <div>
+            <h5 class="mb-1">Maintenance Mode Enabled</h5>
+            <p class="mb-0">{{ maintenance_info.message }}</p>
+            {% if maintenance_info.estimated_duration %}
+            <small class="text-muted">Estimated Duration: {{ maintenance_info.estimated_duration }}</small>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tools Configuration -->
+<div class="row">
+    {% for tool in tools %}
+    <div class="col-xl-6 col-lg-6 mb-4">
+        <div class="admin-card tool-config-card" data-tool="{{ tool.tool_name }}">
+            <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                    <div class="tool-icon me-3" style="background-color: {{ tool.background_color }}; color: {{ tool.text_color }};">
+                        <i class="{{ tool.icon_class }}"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0">{{ tool.display_name }}</h5>
+                        <small class="text-muted">{{ tool.tool_name }}</small>
+                    </div>
+                </div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input tool-enabled" type="checkbox" 
+                           {% if tool.is_enabled %}checked{% endif %}
+                           data-tool="{{ tool.tool_name }}">
+                    <label class="form-check-label">
+                        {% if tool.is_enabled %}Enabled{% else %}Disabled{% endif %}
+                    </label>
+                </div>
+            </div>
+            <div class="card-body">
+                <form class="tool-config-form" data-tool="{{ tool.tool_name }}">
+                    <!-- Basic Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Tool Name</label>
+                            <input type="text" class="form-control" name="display_name" 
+                                   value="{{ tool.display_name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Tool Icon</label>
+                            <input type="text" class="form-control" name="icon_class" 
+                                   value="{{ tool.icon_class }}" placeholder="fas fa-heading">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tool Description</label>
+                        <textarea class="form-control" rows="2" name="description">{{ tool.description or '' }}</textarea>
+                    </div>
+                    
+                    <!-- Color Configuration -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Background Color</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="color" class="form-control form-control-color" 
+                                       name="background_color" value="{{ tool.background_color }}" style="width: 50px;">
+                                <input type="text" class="form-control" value="{{ tool.background_color }}" 
+                                       name="background_color_text" style="width: 100px;">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Text Color</label>
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="color" class="form-control form-control-color" 
+                                       name="text_color" value="{{ tool.text_color }}" style="width: 50px;">
+                                <input type="text" class="form-control" value="{{ tool.text_color }}" 
+                                       name="text_color_text" style="width: 100px;">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Usage Limits -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Usage Limit (Free Account)</label>
+                            <input type="number" class="form-control" name="daily_limit_free" 
+                                   value="{{ tool.daily_limit_free }}" min="0" max="100">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Usage Limit (Premium Account)</label>
+                            <input type="number" class="form-control" name="daily_limit_premium" 
+                                   value="{{ tool.daily_limit_premium }}" min="0" max="9999">
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Settings -->
+                    <div class="accordion mb-3">
+                        <div class="accordion-item bg-dark border-secondary">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed bg-dark text-light border-0" type="button" 
+                                        data-bs-toggle="collapse" data-bs-target="#advanced-{{ tool.tool_name }}"
+                                        aria-expanded="false">
+                                    Advanced Settings
+                                </button>
+                            </h2>
+                            <div id="advanced-{{ tool.tool_name }}" class="accordion-collapse collapse">
+                                <div class="accordion-body bg-dark">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" name="is_premium" 
+                                                       {% if tool.is_premium %}checked{% endif %}>
+                                                <label class="form-check-label">Premium Tool Only</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Display Order</label>
+                                            <input type="number" class="form-control" name="sort_order" 
+                                                   value="{{ tool.sort_order }}" min="0" max="99">
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Custom CSS</label>
+                                        <textarea class="form-control font-monospace" rows="4" name="custom_css"
+                                                  placeholder="/* Add custom tool CSS here */">{{ tool.custom_css or '' }}</textarea>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label class="form-label">Custom AI Prompt</label>
+                                        <textarea class="form-control" rows="3" name="custom_prompt"
+                                                  placeholder="Add custom AI instructions...">{{ tool.custom_prompt or '' }}</textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tool Actions -->
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="previewTool('{{ tool.tool_name }}')">
+                                <i class="fas fa-eye me-1"></i>Preview
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetTool('{{ tool.tool_name }}')">
+                                <i class="fas fa-undo me-1"></i>Reset
+                            </button>
+                        </div>
+                        <button type="button" class="btn btn-success btn-sm" onclick="saveToolConfig('{{ tool.tool_name }}')">
+                            <i class="fas fa-save me-1"></i>Save
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Maintenance Mode Modal -->
+<div class="modal fade" id="maintenanceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="fas fa-tools me-2"></i>Maintenance Mode Management
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="maintenanceForm">
+                    <div class="mb-3">
+                        <label class="form-label">Maintenance Title</label>
+                        <input type="text" class="form-control" id="maintenanceTitle" 
+                               value="{{ maintenance_info.title }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Maintenance Message</label>
+                        <textarea class="form-control" rows="3" id="maintenanceMessage" 
+                                  required>{{ maintenance_info.message }}</textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Start Time</label>
+                                <input type="datetime-local" class="form-control" id="maintenanceStartTime"
+                                       value="{{ maintenance_info.start_time }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">End Time</label>
+                                <input type="datetime-local" class="form-control" id="maintenanceEndTime"
+                                       value="{{ maintenance_info.end_time }}">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Estimated Duration</label>
+                        <input type="text" class="form-control" id="maintenanceDuration" 
+                               value="{{ maintenance_info.estimated_duration or '' }}" 
+                               placeholder="Example: 2 hours">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-secondary">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="confirmMaintenanceToggle()">
+                    {% if maintenance_info.is_enabled %}
+                        Disable Maintenance
+                    {% else %}
+                        Enable Maintenance
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tool Preview Modal -->
+<div class="modal fade" id="toolPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">
+                    <i class="fas fa-eye me-2"></i>Tool Preview
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="toolPreviewContent">
+                    <!-- Preview content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.tool-config-card {
+    transition: all 0.3s ease;
+}
+
+.tool-config-card.tool-disabled {
+    opacity: 0.6;
+    background: linear-gradient(45deg, #1e2329, #2d1e1e);
+}
+
+.tool-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+}
+
+.form-control-color {
+    height: 38px;
+    border-radius: 6px;
+}
+
+.font-monospace {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.accordion-button.collapsed {
+    background: var(--card-bg) !important;
+    color: #e2e8f0 !important;
+}
+
+.accordion-button:not(.collapsed) {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+}
+
+.tool-enabled:checked {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.tool-enabled:not(:checked) {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+@media (max-width: 768px) {
+    .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .tool-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentMaintenanceEnabled = {{ maintenance_info.is_enabled | tojson }};
+
+// Color picker synchronization
+document.addEventListener('DOMContentLoaded', function() {
+    // Synchronize color pickers with text inputs
+    document.querySelectorAll('input[type="color"]').forEach(colorPicker => {
+        const textInput = colorPicker.parentNode.querySelector('input[type="text"]');
+        
+        colorPicker.addEventListener('change', function() {
+            textInput.value = this.value;
+            updateToolPreview(colorPicker.closest('.tool-config-card').dataset.tool);
+        });
+        
+        textInput.addEventListener('change', function() {
+            if (this.value.match(/^#[0-9A-F]{6}$/i)) {
+                colorPicker.value = this.value;
+                updateToolPreview(colorPicker.closest('.tool-config-card').dataset.tool);
+            }
+        });
+    });
+    
+    // Tool enabled/disabled toggle
+    document.querySelectorAll('.tool-enabled').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const toolCard = this.closest('.tool-config-card');
+            const toolName = this.dataset.tool;
+            const label = this.nextElementSibling;
+            
+            if (this.checked) {
+                toolCard.classList.remove('tool-disabled');
+                label.textContent = 'مفعل';
+            } else {
+                toolCard.classList.add('tool-disabled');
+                label.textContent = 'معطل';
+            }
+            
+            // Auto-save tool status
+            saveToolConfig(toolName);
+        });
+    });
+    
+    // Initialize tool card states
+    document.querySelectorAll('.tool-enabled').forEach(toggle => {
+        if (!toggle.checked) {
+            toggle.closest('.tool-config-card').classList.add('tool-disabled');
+        }
+    });
+});
+
+async function saveToolConfig(toolName) {
+    const form = document.querySelector(`[data-tool="${toolName}"]`);
+    const formData = new FormData(form);
+    const data = {
+        tool_name: toolName
+    };
+    
+    // Collect form data
+    for (let [key, value] of formData.entries()) {
+        if (key.includes('_color_text')) continue; // Skip text color inputs
+        
+        if (key === 'is_premium' || key.includes('checkbox')) {
+            data[key] = formData.has(key);
+        } else if (key.includes('limit') || key === 'sort_order') {
+            data[key] = parseInt(value) || 0;
+        } else {
+            data[key] = value;
+        }
+    }
+    
+    // Get enabled status from toggle
+    const enabledToggle = document.querySelector(`[data-tool="${toolName}"].tool-enabled`);
+    data['is_enabled'] = enabledToggle.checked;
+    
+    try {
+        const response = await fetch('/admin/tools-config/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', `تم حفظ إعدادات ${toolName} بنجاح`);
+            updateToolPreview(toolName);
+        } else {
+            showAlert('danger', 'خطأ في حفظ الإعدادات: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error saving tool config:', error);
+        showAlert('danger', 'فشل في حفظ إعدادات الأداة');
+    }
+}
+
+async function saveAllToolsConfig() {
+    const tools = document.querySelectorAll('.tool-config-form');
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (let form of tools) {
+        const toolName = form.dataset.tool;
+        try {
+            await saveToolConfig(toolName);
+            successCount++;
+        } catch (error) {
+            failCount++;
+        }
+    }
+    
+    if (failCount === 0) {
+        showAlert('success', `تم حفظ إعدادات جميع الأدوات (${successCount}) بنجاح`);
+    } else {
+        showAlert('warning', `تم حفظ ${successCount} أدوات، فشل في حفظ ${failCount} أدوات`);
+    }
+}
+
+function toggleMaintenanceMode() {
+    const modal = new bootstrap.Modal(document.getElementById('maintenanceModal'));
+    modal.show();
+}
+
+async function confirmMaintenanceToggle() {
+    const form = document.getElementById('maintenanceForm');
+    const formData = new FormData(form);
+    
+    const data = {
+        enabled: !currentMaintenanceEnabled,
+        title: document.getElementById('maintenanceTitle').value,
+        message: document.getElementById('maintenanceMessage').value,
+        estimated_duration: document.getElementById('maintenanceDuration').value,
+        start_time: document.getElementById('maintenanceStartTime').value,
+        end_time: document.getElementById('maintenanceEndTime').value
+    };
+    
+    try {
+        const response = await fetch('/admin/maintenance/toggle', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', result.message);
+            currentMaintenanceEnabled = !currentMaintenanceEnabled;
+            
+            // Update button text
+            const toggleBtn = document.querySelector('.btn-warning');
+            if (currentMaintenanceEnabled) {
+                toggleBtn.innerHTML = '<i class="fas fa-tools me-2"></i>إلغاء الصيانة';
+            } else {
+                toggleBtn.innerHTML = '<i class="fas fa-tools me-2"></i>تفعيل الصيانة';
+            }
+            
+            // Close modal and refresh page
+            bootstrap.Modal.getInstance(document.getElementById('maintenanceModal')).hide();
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showAlert('danger', 'خطأ في تغيير وضع الصيانة: ' + result.message);
+        }
+    } catch (error) {
+        console.error('Error toggling maintenance:', error);
+        showAlert('danger', 'فشل في تغيير وضع الصيانة');
+    }
+}
+
+function previewTool(toolName) {
+    const form = document.querySelector(`[data-tool="${toolName}"]`);
+    const displayName = form.querySelector('[name="display_name"]').value;
+    const description = form.querySelector('[name="description"]').value;
+    const iconClass = form.querySelector('[name="icon_class"]').value;
+    const bgColor = form.querySelector('[name="background_color"]').value;
+    const textColor = form.querySelector('[name="text_color"]').value;
+    const isEnabled = document.querySelector(`[data-tool="${toolName}"].tool-enabled`).checked;
+    
+    const previewContent = `
+        <div class="tool-preview-card ${!isEnabled ? 'disabled' : ''}" style="max-width: 400px; margin: 0 auto;">
+            <div class="card admin-card">
+                <div class="card-body text-center p-4">
+                    <div class="tool-icon-large mb-3" style="background-color: ${bgColor}; color: ${textColor};">
+                        <i class="${iconClass}"></i>
+                    </div>
+                    <h5 class="card-title">${displayName}</h5>
+                    <p class="card-text text-muted">${description}</p>
+                    <div class="tool-status mt-3">
+                        <span class="badge ${isEnabled ? 'bg-success' : 'bg-danger'}">
+                            ${isEnabled ? 'مفعل' : 'معطل'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+            .tool-icon-large {
+                width: 80px;
+                height: 80px;
+                border-radius: 15px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 2rem;
+                margin: 0 auto;
+            }
+            
+            .tool-preview-card.disabled {
+                opacity: 0.6;
+                filter: grayscale(50%);
+            }
+        </style>
+    `;
+    
+    document.getElementById('toolPreviewContent').innerHTML = previewContent;
+    const modal = new bootstrap.Modal(document.getElementById('toolPreviewModal'));
+    modal.show();
+}
+
+function resetTool(toolName) {
+    if (confirm('هل تريد إعادة تعيين إعدادات هذه الأداة إلى القيم الافتراضية؟')) {
+        // This would typically fetch default values and reset the form
+        showAlert('info', 'تم إعادة تعيين الإعدادات');
+        location.reload();
+    }
+}
+
+function updateToolPreview(toolName) {
+    // Update the tool card's visual appearance in real-time
+    const card = document.querySelector(`[data-tool="${toolName}"]`);
+    const icon = card.querySelector('.tool-icon');
+    const bgColor = card.querySelector('[name="background_color"]').value;
+    const textColor = card.querySelector('[name="text_color"]').value;
+    
+    icon.style.backgroundColor = bgColor;
+    icon.style.color = textColor;
+}
+
+// Utility function for showing alerts
+function showAlert(type, message) {
+    const alertContainer = document.querySelector('.alert-container') || createAlertContainer();
+    
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    alertContainer.appendChild(alert);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        if (alert.parentNode) {
+            alert.remove();
+        }
+    }, 5000);
+}
+
+function createAlertContainer() {
+    const container = document.createElement('div');
+    container.className = 'alert-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '9999';
+    document.body.appendChild(container);
+    return container;
+}
+</script>
+{% endblock %}

@@ -1,0 +1,52 @@
+<div class="card border-0 shadow-sm mb-3">
+            <div class="card-header border-0" style="background: linear-gradient(135deg, #fff3cd, #ffd43b);">
+                <h5 class="card-title mb-0 d-flex align-items-center">
+                    <i class="fas fa-trophy text-warning me-2"></i>Publishing Progress
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="progress-tracker">
+                    <div class="progress-step completed">
+                        <div class="step-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="step-content">
+                            <h6 class="mb-1">Account Setup</h6>
+                            <small class="text-success">Completed</small>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-step completed">
+                        <div class="step-icon">
+                            <i class="fas fa-envelope-check"></i>
+                        </div>
+                        <div class="step-content">
+                            <h6 class="mb-1">Email Verified</h6>
+                            <small class="text-success">
+                                Completed
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-step completed">
+                        <div class="step-icon">
+                            <i class="fas fa-tools"></i>
+                        </div>
+                        <div class="step-content">
+                            <h6 class="mb-1">First Tool Use</h6>
+                            <small class="text-success">
+                                Completed
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3 text-center">
+                    
+                        <span class="badge bg-success">
+                            <i class="fas fa-check me-1"></i>Great Progress!
+                        </span>
+                    
+                </div>
+            </div>
+        </div>

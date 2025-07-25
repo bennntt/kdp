@@ -1,0 +1,273 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Database Management - Admin Panel{% endblock %}
+
+{% block admin_content %}
+<div class="database-management">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 mb-1">Database Management</h1>
+            <p class="text-muted">Manage database tables, relationships, and operations</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-info">
+                <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+            <button class="btn btn-primary">
+                <i class="fas fa-plus me-2"></i>Run Query
+            </button>
+        </div>
+    </div>
+
+    <!-- Database Overview -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-primary text-white rounded me-3">
+                            <i class="fas fa-table"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Total Tables</h6>
+                            <h4 class="mb-0">{{ table_count or 12 }}</h4>
+                            <small class="text-muted">Database tables</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-success text-white rounded me-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Total Users</h6>
+                            <h4 class="mb-0">{{ total_users or 0 }}</h4>
+                            <small class="text-muted">Registered users</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-warning text-white rounded me-3">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Tool Usage</h6>
+                            <h4 class="mb-0">{{ total_usage or 0 }}</h4>
+                            <small class="text-muted">Total tool uses</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="icon-shape bg-info text-white rounded me-3">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div>
+                            <h6 class="mb-0">Database Size</h6>
+                            <h4 class="mb-0">45.2 MB</h4>
+                            <small class="text-muted">Total size</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Database Tables -->
+    <div class="row">
+        <div class="col-lg-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="card-title mb-0">Database Tables</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Table Name</th>
+                                    <th>Records</th>
+                                    <th>Size</th>
+                                    <th>Last Updated</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-users text-primary me-2"></i>
+                                            <div>
+                                                <div class="fw-semibold">user</div>
+                                                <small class="text-muted">User accounts</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ total_users or 0 }}</td>
+                                    <td>2.1 MB</td>
+                                    <td>
+                                        <div class="small">2025-07-20</div>
+                                        <small class="text-muted">01:30 AM</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="Export">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-chart-line text-success me-2"></i>
+                                            <div>
+                                                <div class="fw-semibold">tool_usage</div>
+                                                <small class="text-muted">Tool usage logs</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>{{ total_usage or 0 }}</td>
+                                    <td>15.4 MB</td>
+                                    <td>
+                                        <div class="small">2025-07-20</div>
+                                        <small class="text-muted">01:42 AM</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="Export">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-list text-warning me-2"></i>
+                                            <div>
+                                                <div class="fw-semibold">action_log</div>
+                                                <small class="text-muted">System activity logs</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>8,234</td>
+                                    <td>3.7 MB</td>
+                                    <td>
+                                        <div class="small">2025-07-20</div>
+                                        <small class="text-muted">01:41 AM</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="Export">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-folder text-info me-2"></i>
+                                            <div>
+                                                <div class="fw-semibold">kdp_category</div>
+                                                <small class="text-muted">Amazon KDP categories</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>6,349</td>
+                                    <td>1.2 MB</td>
+                                    <td>
+                                        <div class="small">2025-07-18</div>
+                                        <small class="text-muted">Static data</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="Export">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <i class="fas fa-envelope text-secondary me-2"></i>
+                                            <div>
+                                                <div class="fw-semibold">contact_message</div>
+                                                <small class="text-muted">Contact form messages</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>45</td>
+                                    <td>0.3 MB</td>
+                                    <td>
+                                        <div class="small">2025-07-19</div>
+                                        <small class="text-muted">11:20 PM</small>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <button class="btn btn-sm btn-outline-primary" title="View">
+                                                <i class="fas fa-eye"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-outline-info" title="Export">
+                                                <i class="fas fa-download"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+
+    </div>
+</div>
+
+<style>
+.database-management .icon-shape {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}

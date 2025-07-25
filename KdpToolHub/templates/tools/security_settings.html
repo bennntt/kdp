@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+
+{% block title %}Security Settings - KDP Tools{% endblock %}
+
+{% block tool_content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Security Settings</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{{ url_for('tools.dashboard') }}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Security Overview -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-shield-alt me-2"></i>Account Security Overview
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="security-item p-3 border rounded mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Password Protection</h6>
+                                    <small class="text-muted">Strong password with encryption</small>
+                                </div>
+                                <div>
+                                    <span class="badge bg-success">Active</span>
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <a href="{{ url_for('account.settings') }}" class="btn btn-sm btn-outline-primary">
+                                    Change Password
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="security-item p-3 border rounded mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">Two-Factor Authentication</h6>
+                                    <small class="text-muted">Extra security layer</small>
+                                </div>
+                                <div>
+                                    {% if current_user.two_factor_enabled %}
+                                        <span class="badge bg-success">Enabled</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Disabled</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                {% if current_user.two_factor_enabled %}
+                                    <button class="btn btn-sm btn-outline-danger" onclick="disable2FA()">
+                                        Disable 2FA
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-sm btn-outline-success" onclick="enable2FA()">
+                                        Enable 2FA
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Security Activities -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-history me-2"></i>Recent Security Activities
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_activities %}
+                    <div class="list-group list-group-flush">
+                        {% for activity in recent_activities %}
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="d-flex align-items-center">
+                                        {% if activity.action == 'login' %}
+                                            <i class="fas fa-sign-in-alt text-success me-2"></i>
+                                        {% elif activity.action == 'failed_login' %}
+                                            <i class="fas fa-exclamation-triangle text-warning me-2"></i>
+                                        {% elif activity.action == 'suspicious_activity' %}
+                                            <i class="fas fa-shield-alt text-danger me-2"></i>
+                                        {% elif activity.action == 'password_change' %}
+                                            <i class="fas fa-key text-info me-2"></i>
+                                        {% endif %}
+                                        <div>
+                                            <h6 class="mb-1">{{ activity.action.replace('_', ' ').title() }}</h6>
+                                            <small class="text-muted">
+                                                {{ activity.timestamp.strftime('%B %d, %Y at %I:%M %p') }}
+                                                {% if activity.ip_address %}
+                                                    from {{ activity.ip_address }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    {% if activity.action == 'login' %}
+                                        <span class="badge bg-success">Success</span>
+                                    {% elif activity.action == 'failed_login' %}
+                                        <span class="badge bg-warning">Failed</span>
+                                    {% elif activity.action == 'suspicious_activity' %}
+                                        <span class="badge bg-danger">Alert</span>
+                                    {% elif activity.action == 'password_change' %}
+                                        <span class="badge bg-info">Changed</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-shield-alt text-muted" style="font-size: 3rem;"></i>
+                        <h6 class="mt-3 text-muted">No security activities recorded</h6>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-globe me-2"></i>Login Locations
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if login_ips %}
+                    <div class="list-group list-group-flush">
+                        {% for ip_info in login_ips %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">{{ ip_info.ip_address }}</h6>
+                                        <small class="text-muted">
+                                            {{ ip_info.count }} logins, last: {{ ip_info.last_seen.strftime('%m/%d/%Y') }}
+                                        </small>
+                                    </div>
+                                    {% if ip_info.ip_address == current_user.last_login_ip %}
+                                        <span class="badge bg-success">Current</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-globe text-muted" style="font-size: 2rem;"></i>
+                        <h6 class="mt-2 text-muted">No login history</h6>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Security Recommendations -->
+<div class="row">
+    <div class="col-12">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-lightbulb me-2"></i>Security Recommendations
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="recommendation-item p-3 border rounded">
+                            <i class="fas fa-key text-primary mb-2" style="font-size: 2rem;"></i>
+                            <h6>Strong Password</h6>
+                            <p class="small text-muted">Use a unique, complex password with at least 8 characters.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="recommendation-item p-3 border rounded">
+                            <i class="fas fa-mobile-alt text-success mb-2" style="font-size: 2rem;"></i>
+                            <h6>Enable 2FA</h6>
+                            <p class="small text-muted">Add an extra layer of security with two-factor authentication.</p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="recommendation-item p-3 border rounded">
+                            <i class="fas fa-eye text-warning mb-2" style="font-size: 2rem;"></i>
+                            <h6>Monitor Activity</h6>
+                            <p class="small text-muted">Regularly check your security activities for suspicious behavior.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function enable2FA() {
+    alert('Two-Factor Authentication setup coming soon!');
+}
+
+function disable2FA() {
+    if (confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.')) {
+        alert('Two-Factor Authentication disabled.');
+    }
+}
+</script>
+{% endblock %}

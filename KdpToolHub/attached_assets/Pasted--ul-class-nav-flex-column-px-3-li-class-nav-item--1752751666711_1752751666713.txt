@@ -1,0 +1,59 @@
+<ul class="nav flex-column px-3">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" href="/tools/dashboard">
+                                            <i class="fas fa-tachometer-alt me-2"></i>Dashboard
+                                        </a>
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Generation Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/title-generator">
+                                            <i class="fas fa-heading me-2"></i>Title Generator
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/subtitle-generator">
+                                            <i class="fas fa-text-height me-2"></i>Subtitle Generator
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/description-generator">
+                                            <i class="fas fa-align-left me-2"></i>Description Generator
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/author-generator">
+                                            <i class="fas fa-user-edit me-2"></i>Author Generator
+                                        </a>
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Research Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/keyword-research">
+                                            <i class="fas fa-search me-2"></i>Keyword Research
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/category-finder">
+                                            <i class="fas fa-tags me-2"></i>Category Finder
+                                        </a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/trademark-search">
+                                            <i class="fas fa-shield-alt me-2"></i>Trademark Search
+                                        </a>
+                                    </li>
+                                    
+                                    <hr class="my-2">
+                                    <h6 class="sidebar-heading text-muted mt-4 mb-1">Business Tools</h6>
+                                    
+                                    <li class="nav-item">
+                                        <a class="nav-link " href="/tools/royalty-calculator">
+                                            <i class="fas fa-calculator me-2"></i>Royalty Calculator
+                                        </a>
+                                    </li>
+                                </ul>

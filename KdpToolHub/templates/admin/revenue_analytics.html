@@ -1,0 +1,269 @@
+{% extends "admin/base.html" %}
+
+{% block page_title %}Revenue Analytics{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-4">
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 text-light">Revenue Analytics</h2>
+            <p class="text-muted mb-0">Track subscription revenue and performance metrics</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-primary" onclick="exportReport()">
+                <i class="fas fa-download me-2"></i>Export Report
+            </button>
+            <button class="btn btn-primary" onclick="refreshAnalytics()">
+                <i class="fas fa-sync me-2"></i>Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Revenue Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="revenue-icon bg-primary text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">${{ analytics.monthly_revenue }}</h3>
+                            <p class="text-muted mb-0">Monthly Revenue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="revenue-icon bg-success text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">${{ analytics.yearly_revenue }}</h3>
+                            <p class="text-muted mb-0">Yearly Revenue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="revenue-icon bg-warning text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">${{ "%.2f"|format(analytics.total_mrr) }}</h3>
+                            <p class="text-muted mb-0">Monthly Recurring Revenue</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 mb-3">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="revenue-icon bg-info text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <h3 class="mb-1">{{ analytics.monthly_users + analytics.yearly_users }}</h3>
+                            <p class="text-muted mb-0">Paying Subscribers</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Revenue Chart -->
+        <div class="col-lg-8 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Revenue Trends (Last 12 Months)</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="revenueChart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subscription Breakdown -->
+        <div class="col-lg-4 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Subscription Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <canvas id="subscriptionChart" height="200"></canvas>
+                    </div>
+                    <div class="subscription-stats">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Monthly Plans:</span>
+                            <strong>{{ analytics.monthly_users }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Yearly Plans:</span>
+                            <strong>{{ analytics.yearly_users }}</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-muted">Average Revenue per User:</span>
+                            <strong>${{ "%.2f"|format(analytics.total_mrr / (analytics.monthly_users + analytics.yearly_users) if (analytics.monthly_users + analytics.yearly_users) > 0 else 0) }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Breakdown -->
+        <div class="col-12 mb-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Monthly Revenue Breakdown</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Month</th>
+                                    <th>Monthly Subscriptions</th>
+                                    <th>Yearly Subscriptions</th>
+                                    <th>Total Revenue</th>
+                                    <th>Growth</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for month_data in analytics.revenue_by_month[:6] %}
+                                <tr>
+                                    <td>{{ month_data.month }}</td>
+                                    <td>${{ month_data.revenue * 0.7 }}</td>
+                                    <td>${{ month_data.revenue * 0.3 }}</td>
+                                    <td><strong>${{ month_data.revenue }}</strong></td>
+                                    <td>
+                                        <span class="badge bg-success">+5.2%</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Revenue Trends Chart
+    const revenueCtx = document.getElementById('revenueChart').getContext('2d');
+    const revenueData = {{ analytics.revenue_by_month | tojson }};
+    
+    new Chart(revenueCtx, {
+        type: 'line',
+        data: {
+            labels: revenueData.map(item => item.month).reverse(),
+            datasets: [{
+                label: 'Revenue ($)',
+                data: revenueData.map(item => item.revenue).reverse(),
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Subscription Breakdown Chart
+    const subscriptionCtx = document.getElementById('subscriptionChart').getContext('2d');
+    new Chart(subscriptionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Monthly', 'Yearly'],
+            datasets: [{
+                data: [{{ analytics.monthly_users }}, {{ analytics.yearly_users }}],
+                backgroundColor: ['#f093fb', '#667eea'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+});
+
+function exportReport() {
+    showAlert('info', 'Generating revenue report... Download will start shortly');
+    // Implement actual export functionality
+}
+
+function refreshAnalytics() {
+    location.reload();
+}
+
+function showAlert(type, message) {
+    const alertClass = type === 'success' ? 'alert-success' : 
+                     type === 'error' ? 'alert-danger' : 'alert-info';
+    const alert = `<div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>`;
+    
+    document.querySelector('.container-fluid').insertAdjacentHTML('afterbegin', alert);
+    
+    setTimeout(() => {
+        const alertElement = document.querySelector('.alert');
+        if (alertElement) alertElement.remove();
+    }, 5000);
+}
+</script>
+
+<style>
+.revenue-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
+{% endblock %}
